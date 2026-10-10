@@ -5,6 +5,8 @@ Read-only inspection of the GitHub default branches of:
 - [jabelburns/clarityforus-site](https://github.com/jabelburns/clarityforus-site)
 - [jabelburns/billwise](https://github.com/jabelburns/billwise)
 - [jabelburns/follow-the-funds](https://github.com/jabelburns/follow-the-funds)
+- [jabelburns/supreme-court-tracker](https://github.com/jabelburns/supreme-court-tracker)
+- [jabelburns/landing](https://github.com/jabelburns/landing)
 
 This audit **did not** have authenticated access to the owner's ChatGPT Sites application, its source, storage, runtime, secrets, or deployment logs. Findings for the Sites prototype are therefore **unverified**, not proof of absence.
 
@@ -31,8 +33,21 @@ This audit **did not** have authenticated access to the owner's ChatGPT Sites ap
 - No working contribution query, FEC ingestion, or validated donor-to-candidate views in the inspected code.
 - Preserve the intended funding exploration, not a claim of production readiness.
 
-### Supreme Court Tracker
-- Existing source location and functionality **not inspected**. Do not mark it absent from Sites, and do not claim it is implemented in GitHub.
+### Supreme Court Tracker: [repository](https://github.com/jabelburns/supreme-court-tracker)
+- Substantial existing application prototype: FastAPI + SQLite backend, React/Vite/Tailwind frontend, case views, justice profiles, glossary, CSV/JSON/PDF export routes, and a GitHub Actions update workflow.
+- Verified files include `backend/main.py`, `backend/utils/fetch_scotus.py`, `backend/utils/seed_db.py`, `frontend/src/App.jsx`, and `.github/workflows/update.yml`.
+- **Not production-verified**: no app execution or current CourtListener data check has occurred. The default-branch tree did not include `backend/data/scotus.db` although the workflow attempts to commit that path; investigate data bootstrap and schedule reliability before reuse. The backend currently sets permissive CORS with credentials; reassess before deployment.
+- This is genuine reusable source to analyze and adapt, not necessarily a drop-in module for the existing Sites D1 architecture.
+
+### Separate Clarity landing scaffold: [repository](https://github.com/jabelburns/landing)
+- A React/Vite/Tailwind ClarityForUs landing scaffold exists, along with bundled `node_modules` and `dist` directories. The README identifies this as a single-page landing website for `clarityforus.org/.com`, not the current ChatGPT Sites application.
+- Do not use the bundled dependencies or old landing page as a replacement for the current Site.
+
+## Deployment discovery — verified 2026-10-10
+- Vercel project `clarityforus-site` is linked to `jabelburns/clarityforus-site` and **production** is deployed from GitHub `main` commit `865f7b3dca994682be65c7b1eee1beaf5f49b96d` (the old static landing).
+- New documentation commits created Vercel **preview** deployments on the audit branch. These do not represent the ChatGPT Sites project, and do not indicate the full application source has been transferred.
+- A Vercel source-file tree was not available for the preview deployment, so no alternate full source was recovered there.
+- The active ChatGPT Site snapshot is recorded in `docs/SITES_BASELINE.md`. This snapshot is rendered text, **not source code or a D1 export**.
 
 ## Product requirements from prior planning — NOT verified as repository features
 A single, searchable civic transparency hub with:
