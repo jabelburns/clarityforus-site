@@ -1,0 +1,60 @@
+name: Clarity staging source verification
+
+on:
+  push:
+    branches:
+      - clarity-sites-v33-1-handoff
+    paths:
+      - 'Clarity-v33.1-GitHub-Handoff-Sanitized.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify archive checksum and exclusion
+        shell: bash
+        run: |
+          test -s Clarity-v33.1-GitHub-Handoff-Sanitized.zip
+          sha256sum -c site-handoff/SOURCE_SHA256SUMS.txt
+          unzip -t Clarity-v33.1-GitHub-Handoff-Sanitized.zip
+          mkdir -p staging-check
+          unzip -q Clarity-v33.1-GitHub-Handoff-Sanitized.zip -d staging-check
+          test -f staging-check/source/package.json
+          test ! -e staging-check/source/.openai/hosting.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned pnpm and dependencies
+        shell: bash
+        working-directory: staging-check/source
+        run: |
+          npm install --global pnpm@11.25.0
+          pnpm install --frozen-lockfile
+      - name: Targeted feature and security regressions
+        shell: bash
+        working-directory: staging-check/source
+        run: |
+          pnpm run test:vision
+          pnpm run test:senate
+          pnpm run test:bill-versions
+          pnpm run test:graph
+          pnpm run test:campaign
+          node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
+      - name: Existing ingestion regression suite
+        shell: bash
+        working-directory: staging-check/source
+        run: pnpm run test:ingestion
+      - name: Lint
+        shell: bash
+        working-directory: staging-check/source
+        run: pnpm run lint
+      - name: Build (not a deployment)
+        shell: bash
+        working-directory: staging-check/source
+        run: pnpm run build
