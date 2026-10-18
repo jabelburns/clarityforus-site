@@ -9,35 +9,73 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify:
+  verify-and-unpack:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Verify archive checksum and exclusion
+        with:
+          persist-credentials: true
+      - name: Verify exact archive and source manifest
         shell: bash
         run: |
           test -s Clarity-v33.1-GitHub-Handoff-Sanitized.zip
           sha256sum -c site-handoff/SOURCE_SHA256SUMS.txt
           unzip -t Clarity-v33.1-GitHub-Handoff-Sanitized.zip
+          rm -rf site-source
+          mkdir -p site-source
+          unzip -q Clarity-v33.1-GitHub-Handoff-Sanitized.zip -d site-source
+          test -f site-source/source/package.json
+          test ! -e site-source/source/.openai/hosting.json
+          python3 - <<'PY'
+          import hashlib, json, pathlib, sys
+          root=pathlib.Path('site-source')
+          manifest=json.loads((root/'SOURCE_MANIFEST.json').read_text())
+          for f in manifest['files']:
+              p=root/f['path']
+              if not p.is_file() or p.stat().st_size!=f['bytes'] or hashlib.sha256(p.read_bytes()).hexdigest()!=f['sha256']:
+                  sys.exit('Invalid or missing source path: '+f['path'])
+          print('Verified',len(manifest['files']),'source files.')
+          PY
+      - name: Commit unpacked source to handoff branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f site-source/
+          if ! git diff --cached --quiet; then
+            git commit -m "source: unpack verified Clarity v33.1 for Sites review [skip ci]"
+            git push origin HEAD:refs/heads/clarity-sites-v33-1-handoff
+          fi
+
+  integration-tests:
+    needs: verify-and-unpack
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check archive digest
+        run: sha256sum -c site-handoff/SOURCE_SHA256SUMS.txt
+      - name: Extract in separate CI sandbox
+        shell: bash
+        run: |
           mkdir -p staging-check
           unzip -q Clarity-v33.1-GitHub-Handoff-Sanitized.zip -d staging-check
           test -f staging-check/source/package.json
-          test ! -e staging-check/source/.openai/hosting.json
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install pinned pnpm and dependencies
-        shell: bash
+      - name: Install pinned dependencies
         working-directory: staging-check/source
         run: |
           npm install --global pnpm@11.25.0
           pnpm install --frozen-lockfile
-      - name: Targeted feature and security regressions
-        shell: bash
+      - name: Feature and security tests
         working-directory: staging-check/source
         run: |
           pnpm run test:vision
@@ -46,15 +84,11 @@ jobs:
           pnpm run test:graph
           pnpm run test:campaign
           node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
-      - name: Existing ingestion regression suite
-        shell: bash
+      - name: Ingestion tests
         working-directory: staging-check/source
         run: pnpm run test:ingestion
-      - name: Lint
-        shell: bash
+      - name: Lint and build (never deploy)
         working-directory: staging-check/source
-        run: pnpm run lint
-      - name: Build (not a deployment)
-        shell: bash
-        working-directory: staging-check/source
-        run: pnpm run build
+        run: |
+          pnpm run lint
+          pnpm run build
