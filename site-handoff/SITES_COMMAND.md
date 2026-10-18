@@ -5,7 +5,7 @@ Use @Sites to work with my **existing** Clarity for US Site, slug **`clarity-for
 I have put our reviewed **v33.1 staging application source archive** in GitHub, **not** in the `main` branch:
 https://github.com/jabelburns/clarityforus-site/tree/clarity-sites-v33-1-handoff
 
-The archive is named **`Clarity-v33.1-GitHub-Handoff-Sanitized.zip`** at the branch root. Please read the **`source/`** directory inside this ZIP. The ZIP omits the original platform-specific `.openai/hosting.json`; retain the current Site hosting configuration and `DB` binding.
+The verified GitHub workflow unpacks the source to **`site-source/source/`** on this branch after the ZIP upload. Prefer reading that normal GitHub source tree. If it has not been unpacked yet, the archive **`Clarity-v33.1-GitHub-Handoff-Sanitized.zip`** is at the branch root; extract its **`source/`** folder. The ZIP omits the original platform-specific `.openai/hosting.json`; retain the current Site hosting configuration and `DB` binding.
 
 **Do a read-only integration review first.** Compare the actual latest Site source against this staging archive and report any newer conflicting modifications. Reconcile all five feature sprints, 435-member House bulk import optimization, and security changes without discarding existing working behavior.
 
