@@ -40,6 +40,7 @@ jobs:
         run: |
           python3 tests/house-bulk-sql.py
           python3 tests/campaign-finance-sql.py
+          python3 tests/d1-restore-audit.py
       - name: Lint
         run: pnpm run lint
       - name: Create disposable CI-only Sites hosting metadata
