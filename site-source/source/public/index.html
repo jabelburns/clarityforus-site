@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Clarity for US connects public officials, candidates, elections, political money, bills, votes, executive actions, beneficiaries, and court challenges in one nonpartisan public-interest platform."
+    />
+    <meta name="theme-color" content="#071513" />
+    <title>Clarity for US — Watch the government</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" id="top">
+      <a class="brand" href="#top" aria-label="Clarity for US home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="brand-copy">
+          <strong>CLARITY</strong>
+          <small>FOR US</small>
+        </span>
+      </a>
+      <button class="menu-button" type="button" aria-controls="site-nav" aria-expanded="false">
+        Menu
+      </button>
+      <nav class="site-nav" id="site-nav" aria-label="Primary navigation">
+        <a href="#explore">Search</a>
+        <a href="#methodology">How it works</a>
+        <a href="#sources-roadmap">Sources &amp; roadmap</a>
+        <a href="#about">About</a>
+        <a class="nav-cta" href="#record-search">Search records</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero section-shell">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> A nonprofit civic transparency project</p>
+          <h1>Search a politician. <em>Follow the money and decisions.</em></h1>
+          <p class="hero-lede">
+            Look up an official, candidate, bill, or executive order. Open a source-backed record, then follow its connections to votes, funding, beneficiaries, and court challenges.
+          </p>
+
+          <form class="hero-search" id="search-form" role="search">
+            <label for="record-search">Search official federal records</label>
+            <div class="hero-search-row">
+              <span aria-hidden="true">⌕</span>
+              <input
+                id="record-search"
+                type="search"
+                placeholder="Name, bill number, committee, contributor, or executive order"
+                autocomplete="off"
+              />
+              <button type="submit">Search</button>
+            </div>
+            <p class="search-coverage" id="search-coverage" role="status">Loading official record coverage…</p>
+            <div class="search-examples" aria-label="Example searches">
+              <span>Try:</span>
+              <button type="button" data-example-search="James Talarico" data-example-filter="election">James Talarico</button>
+              <button type="button" data-example-search="H.R. 5744" data-example-filter="bill">H.R. 5744</button>
+              <button type="button" data-example-search="Executive Order" data-example-filter="executive-order">Executive Order</button>
+            </div>
+          </form>
+
+          <ol class="search-steps" aria-label="How to use Clarity">
+            <li><span>1</span><strong>Search</strong> a name or measure</li>
+            <li><span>2</span><strong>Open</strong> a source-backed record</li>
+            <li><span>3</span><strong>Follow</strong> money, votes, bills, and legal links</li>
+          </ol>
+          <ul class="trust-list" aria-label="Project principles">
+            <li>Nonpartisan</li>
+            <li>Source-linked</li>
+            <li>Plain English</li>
+            <li>Public first</li>
+          </ul>
+        </div>
+
+        <div class="signal-card" aria-label="Illustration of connected government records">
+          <div class="signal-topline">
+            <span>THE CLARITY GRAPH</span>
+            <span class="live-dot">SOURCE-LINKED RELATIONSHIPS</span>
+          </div>
+          <div class="signal-canvas" aria-hidden="true">
+            <svg viewBox="0 0 620 460" role="img">
+              <defs>
+                <linearGradient id="lineGlow" x1="0" x2="1">
+                  <stop offset="0" stop-color="#79e5cc" stop-opacity=".25" />
+                  <stop offset=".55" stop-color="#79e5cc" />
+                  <stop offset="1" stop-color="#f2a65a" stop-opacity=".55" />
+                </linearGradient>
+                <marker id="arrowMint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#79e5cc" />
+                </marker>
+                <marker id="arrowOrange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#f2a65a" />
+                </marker>
+              </defs>
+              <g class="graph-record-lines" fill="none" stroke="#79e5cc" stroke-width="2" marker-end="url(#arrowMint)">
+                <path d="M104 70 L162 70" />
+                <path d="M232 70 L287 70" />
+                <path d="M330 108 L330 155" />
+                <path d="M374 190 C414 155 445 112 476 91" />
+                <path d="M378 205 L475 188" />
+                <path d="M374 224 C420 238 446 270 476 285" />
+                <path d="M531 157 C555 136 557 118 535 108" />
+                <path d="M536 102 C585 180 580 328 548 365" />
+                <path d="M537 305 C558 330 558 350 545 366" />
+              </g>
+              <g class="graph-context-lines" fill="none" stroke="#79e5cc" stroke-width="1.6">
+                <path d="M102 205 C205 205 352 112 475 82" />
+                <path d="M103 338 C175 330 230 252 282 225" />
+              </g>
+              <g class="graph-analysis-lines" fill="none" stroke="#f2a65a" stroke-width="2" marker-end="url(#arrowOrange)">
+                <path d="M485 108 C455 225 408 326 382 360" />
+                <path d="M480 302 C438 330 414 350 392 373" />
+              </g>
+
+              <g class="graph-node graph-node-small">
+                <circle cx="72" cy="70" r="32" />
+                <text x="72" y="66">$</text>
+                <text class="graph-label" x="72" y="87">MONEY</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="197" cy="70" r="35" />
+                <text x="197" y="66">⇄</text>
+                <text class="graph-label" x="197" y="87">PACS / COMMITTEES</text>
+              </g>
+              <g class="graph-node graph-node-core graph-node-election">
+                <circle cx="330" cy="70" r="38" />
+                <text x="330" y="65">◇</text>
+                <text class="graph-label" x="330" y="87">CANDIDATES / ELECTIONS</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="72" cy="205" r="32" />
+                <text x="72" y="201">↗</text>
+                <text class="graph-label" x="72" y="222">LOBBYING</text>
+              </g>
+              <g class="graph-node graph-node-core">
+                <circle cx="330" cy="205" r="48" />
+                <text x="330" y="199">●</text>
+                <text class="graph-label" x="330" y="224">PUBLIC OFFICIALS</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="72" cy="338" r="32" />
+                <text x="72" y="334">★</text>
+                <text class="graph-label" x="72" y="355">PRESIDENTIAL $</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="510" cy="80" r="32" />
+                <text x="510" y="76">§</text>
+                <text class="graph-label" x="510" y="97">BILLS / LAWS</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="510" cy="185" r="32" />
+                <text x="510" y="181">✓</text>
+                <text class="graph-label" x="510" y="202">VOTES</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="510" cy="290" r="32" />
+                <text x="510" y="286">✦</text>
+                <text class="graph-label" x="510" y="307">EXEC. ORDERS</text>
+              </g>
+              <g class="graph-node graph-node-small">
+                <circle cx="525" cy="395" r="34" />
+                <text x="525" y="391">⚖</text>
+                <text class="graph-label" x="525" y="412">COURT CHALLENGES</text>
+              </g>
+              <g class="graph-node-analysis">
+                <rect x="215" y="360" width="220" height="64" rx="32" />
+                <text x="325" y="386">WHO BENEFITS? WHO PAYS?</text>
+                <text class="graph-label" x="325" y="406">TEXT + COSTS + IMPLEMENTATION EVIDENCE</text>
+              </g>
+            </svg>
+          </div>
+          <p class="signal-caption graph-legend">
+            <span><i class="legend-solid"></i>Official record link</span>
+            <span><i class="legend-dashed"></i>Contextual disclosure</span>
+            <strong>No connection alone proves influence.</strong>
+          </p>
+        </div>
+      </section>
+
+      <section class="principle-bar" aria-label="Clarity for US mission statement">
+        <p><strong>Power leaves a paper trail.</strong> We’re building the map.</p>
+      </section>
+
+      <section class="explorer-section section-shell" id="explore">
+        <div class="results-heading">
+          <div>
+            <p class="eyebrow"><span></span> Official database</p>
+            <h2>Search results</h2>
+          </div>
+          <p>Open a record to see its original source and connected people, money, measures, votes, and legal records.</p>
+        </div>
+
+        <div class="explorer">
+          <div class="filter-panel" aria-label="Search filters">
+            <div class="filter-heading">
+              <span>FILTER BY RECORD TYPE</span>
+              <button type="button" id="clear-filters">Clear</button>
+            </div>
+            <div class="filter-list" id="record-filters">
+              <button class="filter-button active" type="button" data-filter="all"><span class="filter-icon">⌘</span> All <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="politician"><span class="filter-icon">●</span> Politicians <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="election"><span class="filter-icon">◇</span> Candidates &amp; elections <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="bill"><span class="filter-icon">§</span> Bills <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="money"><span class="filter-icon">↗</span> Money records <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="committee"><span class="filter-icon">$</span> PACs &amp; Super PACs <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="contributor"><span class="filter-icon">◎</span> Contributors <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="case"><span class="filter-icon">⚖</span> Court cases <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="vote"><span class="filter-icon">✓</span> Votes <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="executive-order"><span class="filter-icon">✦</span> Executive orders <b>0</b></button>
+              <button class="filter-button" type="button" data-filter="presidential-funding"><span class="filter-icon">★</span> Presidential funding <b>0</b></button>
+            </div>
+          </div>
+
+          <div class="results-panel">
+            <div class="results-meta">
+              <p><strong id="result-count">0</strong> records in this view</p>
+              <span id="result-source">Loading source-backed records…</span>
+            </div>
+            <div class="records-loading" id="records-loading" role="status">Loading official records…</div>
+            <div class="record-grid" id="record-grid" aria-live="polite"></div>
+            <div class="empty-state" id="empty-state" hidden>
+              <span>⌕</span>
+              <h3>No official records match that search.</h3>
+              <p>Try “James Talarico,” “H.R. 5744,” or “Executive Order.”</p>
+            </div>
+          </div>
+        </div>
+
+        <details class="public-analytics" id="public-analytics">
+          <summary><span><strong>What does our database actually cover?</strong><small>Record counts, evidence types, vote records and financial disclosures—not political ratings</small></span><span aria-hidden="true">+</span></summary>
+          <div class="public-analytics-body">
+            <p class="analytics-note">These figures count records already ingested by Clarity. They do not measure how much of the government's published data we have captured.</p>
+            <div class="analytics-grid" id="analytics-grid" role="status" aria-live="polite">Open this panel to load current figures.</div>
+            <p class="analytics-note" id="analytics-limitations">Campaign contributions, transfers and outside expenditures are different financial categories. Clarity never combines them into a single implied influence score.</p>
+          </div>
+        </details>
+
+        <details class="data-status" id="data-status">
+          <summary>
+            <span><strong>Live data and owner controls</strong><small>See connected sources, coverage, and refresh tools</small></span>
+            <span class="status-pill status-checking" id="data-health">Checking system…</span>
+          </summary>
+          <div class="data-status-body">
+            <div class="data-status-heading">
+              <div>
+                <span>PRODUCTION DATA LAYER</span>
+                <h3 id="data-status-title">Official federal records are connected.</h3>
+              </div>
+            </div>
+            <div class="connector-grid" id="connector-grid">
+              <article><span>DATABASE</span><strong>D1 civic graph</strong><small id="database-detail">Checking migrations…</small></article>
+              <article><span>LIVE · NO KEY</span><strong>Federal Register</strong><small id="federal-register-detail">Checking connection…</small></article>
+              <article><span>LIVE · NO KEY</span><strong>House Clerk</strong><small id="house-clerk-detail">Checking connection…</small></article>
+              <article><span>PROTECTED SOURCE</span><strong>Congress.gov</strong><small id="congress-detail">Checking credential…</small></article>
+              <article><span>PROTECTED SOURCE</span><strong>OpenFEC</strong><small id="fec-detail">Checking credential…</small></article>
+              <article><span>ANALYSIS ENGINE</span><strong>Sourced bill AI</strong><small id="ai-detail">Checking credential…</small></article>
+              <article><span>PROTECTED SOURCE</span><strong>CourtListener / RECAP</strong><small id="courtlistener-detail">Checking credential…</small></article>
+            </div>
+            <div class="data-status-actions">
+              <button class="button button-primary" id="sync-records" type="button">Refresh official records <span>↓</span></button>
+              <p id="sync-message" role="status" aria-live="polite">Owner-only refresh. Source evidence and retrieval dates are preserved.</p>
+            </div>
+            <section class="coverage-dashboard" id="coverage-dashboard" aria-labelledby="coverage-title">
+              <div class="coverage-dashboard-heading">
+                <div>
+                  <span>OWNER COVERAGE DASHBOARD</span>
+                  <h4 id="coverage-title">Backfill, freshness, and identity review</h4>
+                </div>
+                <button class="coverage-refresh" id="coverage-refresh" type="button">Check now</button>
+              </div>
+              <div class="coverage-alerts" id="coverage-alerts" role="status">Loading owner diagnostics…</div>
+              <div class="coverage-grid">
+                <div>
+                  <h5>Historical backfills</h5>
+                  <div id="backfill-dashboard" class="coverage-list"></div>
+                </div>
+                <div>
+                  <h5>Source freshness</h5>
+                  <div id="freshness-dashboard" class="coverage-list"></div>
+                </div>
+              </div>
+              <div class="identity-review-panel">
+                <h5>Identity review</h5>
+                <p id="identity-review-summary">Checking for candidate and officeholder records that must remain separate pending review…</p>
+                <div id="identity-review-list" class="identity-review-list"></div>
+              </div>
+              <div class="recent-runs-panel">
+                <h5>Recent ingestion runs</h5>
+                <div id="recent-runs-dashboard" class="coverage-list coverage-runs"></div>
+              </div>
+            </section>
+          </div>
+        </details>
+      </section>
+
+      <details class="deep-dive" id="methodology">
+        <summary>
+          <span><small>OPTIONAL DEEP DIVE</small><strong>How Clarity connects money, votes, bills, and courts</strong></span>
+          <span aria-hidden="true">+</span>
+        </summary>
+        <div class="deep-dive-content">
+
+      <section class="analysis-section" id="bill-analysis">
+        <div class="section-shell analysis-layout">
+          <div class="analysis-intro">
+            <p class="eyebrow"><span></span> The Clarity analysis standard</p>
+            <h2>Every bill gets one unavoidable question: <em>Who benefits?</em></h2>
+            <p>
+              AI will explain the bill in plain English, but it will not hand down a political verdict. It will separate the text, outside evidence, and reasoned analysis—and cite the source behind every material claim.
+            </p>
+            <div class="analysis-principle">
+              <span>REQUIRED ON EVERY BILL</span>
+              <strong>Who benefits, who pays, and who carries the risk?</strong>
+            </div>
+          </div>
+          <article class="analysis-panel" aria-label="Clarity AI bill analysis standard">
+            <div class="analysis-header">
+              <span>AI BILL EXPLAINER</span>
+              <span>AVAILABLE ON SOURCE-BACKED BILLS</span>
+            </div>
+            <div class="analysis-question"><span>01</span><div><strong>What actually changes?</strong><p>Current law, proposed language, amendments, dates, agency discretion, and sunset provisions.</p></div></div>
+            <div class="analysis-question featured"><span>02</span><div><strong>Who benefits?</strong><p>Direct beneficiaries first, then likely secondary beneficiaries—named as specifically as the evidence allows.</p></div></div>
+            <div class="analysis-question"><span>03</span><div><strong>Who pays or carries risk?</strong><p>Taxpayers, affected communities, regulated entities, workers, consumers, states, and future budgets.</p></div></div>
+            <div class="analysis-question"><span>04</span><div><strong>Who is backing or opposing it?</strong><p>Sponsors, committees, disclosed donors, outside spending, lobby filings, and public organizational positions.</p></div></div>
+            <div class="analysis-question"><span>05</span><div><strong>What could be challenged?</strong><p>Potential legal issues are labeled analysis. Actual lawsuits appear only when filed and link to the docket and rulings.</p></div></div>
+            <div class="analysis-question"><span>06</span><div><strong>What remains uncertain?</strong><p>Missing data, disputed estimates, implementation choices, assumptions, and confidence labels.</p></div></div>
+            <footer><strong>AI explains. Sources prove.</strong><span>No unsupported claims. No guilt by graph.</span></footer>
+          </article>
+        </div>
+      </section>
+
+      <section class="system-section" id="system">
+        <div class="section-shell">
+          <div class="section-heading heading-row light-heading">
+            <div>
+              <p class="eyebrow"><span></span> The missing connections</p>
+              <h2>Government data is public.<br />The system is still hidden.</h2>
+            </div>
+            <p>
+              The facts live in different databases, formats, and agencies. Clarity for US joins them into one traceable chain without pretending correlation automatically proves influence.
+            </p>
+          </div>
+
+          <div class="trace-layout">
+            <div class="trace-path" id="trace-path" aria-label="Interactive example relationship path">
+              <button type="button" class="trace-node active" data-step="0">
+                <span>01</span><b>Contributor</b><small>Who supplied the money?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="1">
+                <span>02</span><b>Committee</b><small>Where did it flow?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="2">
+                <span>03</span><b>Presidential money</b><small>What kind of funding?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="3">
+                <span>04</span><b>Candidate & election</b><small>Who is seeking power?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="4">
+                <span>05</span><b>Public official</b><small>What power do they hold?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="5">
+                <span>06</span><b>Bill & vote</b><small>What action followed?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="6">
+                <span>07</span><b>Impact</b><small>Who benefits or pays?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="7">
+                <span>08</span><b>Executive order</b><small>What power was used?</small>
+              </button>
+              <button type="button" class="trace-node" data-step="8">
+                <span>09</span><b>Court challenge</b><small>What was contested?</small>
+              </button>
+            </div>
+            <article class="trace-detail" id="trace-detail">
+              <div class="trace-detail-top">
+                <span class="demo-badge">ILLUSTRATIVE TRACE</span>
+                <span id="trace-number">01 / 09</span>
+              </div>
+              <p class="trace-kicker" id="trace-kicker">START WITH THE SOURCE</p>
+              <h3 id="trace-title">A contributor reports a political expenditure.</h3>
+              <p id="trace-copy">
+                The record should show the filer, amount, date, recipient, filing type, and a direct link back to the original disclosure.
+              </p>
+              <div class="evidence-row">
+                <span>Evidence standard</span>
+                <strong id="trace-evidence">Original filing + normalized entity</strong>
+              </div>
+              <button class="text-button" type="button" id="next-trace">Next connection →</button>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="records-section section-shell">
+        <div class="section-heading centered-heading">
+          <p class="eyebrow"><span></span> Ten records. One system.</p>
+          <h2>Everything citizens need to trace public power.</h2>
+          <p>Each profile is useful alone. The real clarity comes from the links between them.</p>
+        </div>
+        <div class="record-types">
+          <article>
+            <span class="type-number">01</span><div class="type-symbol">●</div>
+            <h3>Public officials</h3><p>Offices, committees, elections, funding, sponsored bills, executive actions, and recorded votes.</p>
+          </article>
+          <article>
+            <span class="type-number">02</span><div class="type-symbol">◇</div>
+            <h3>Candidates & elections</h3><p>Federal races, ballot status, incumbents, challengers, fundraising, spending, results, and comparable public records.</p>
+          </article>
+          <article>
+            <span class="type-number">03</span><div class="type-symbol">↗</div>
+            <h3>Contributions</h3><p>Amounts, dates, recipients, filing records, refunds, and independent expenditures.</p>
+          </article>
+          <article>
+            <span class="type-number">04</span><div class="type-symbol">§</div>
+            <h3>Bills & laws</h3><p>Official text, sourced AI explanations, sponsors, votes, costs, beneficiaries, implementation, and enacted-law status.</p>
+          </article>
+          <article>
+            <span class="type-number">05</span><div class="type-symbol">$</div>
+            <h3>PACs & Super PACs</h3><p>Committees, affiliated groups, receipts, spending, supported candidates, and filings.</p>
+          </article>
+          <article>
+            <span class="type-number">06</span><div class="type-symbol">◎</div>
+            <h3>Contributors</h3><p>Disclosed giving patterns, employers, geography, committees, and recipient networks.</p>
+          </article>
+          <article>
+            <span class="type-number">07</span><div class="type-symbol">✓</div>
+            <h3>Votes</h3><p>Official roll calls, motions, results, member positions, and the measures they changed.</p>
+          </article>
+          <article>
+            <span class="type-number">08</span><div class="type-symbol">✦</div>
+            <h3>Executive orders</h3><p>Full text, legal authority, issuing president, affected agencies, deadlines, revocations, funding links, and court challenges.</p>
+          </article>
+          <article>
+            <span class="type-number">09</span><div class="type-symbol">★</div>
+            <h3>Presidential funding</h3><p>Campaign money, outside spending, inaugural donations, transition resources, and clearly labeled presidential-library disclosure gaps.</p>
+          </article>
+          <article>
+            <span class="type-number">10</span><div class="type-symbol">⚖</div>
+            <h3>Court cases</h3><p>Federal dockets, complaints, injunctions, appeals, Supreme Court opinions, votes, and legal consequences.</p>
+          </article>
+        </div>
+      </section>
+
+        </div>
+      </details>
+
+      <details class="deep-dive" id="sources-roadmap">
+        <summary>
+          <span><small>REFERENCE</small><strong>Sources, evidence rules, and development roadmap</strong></span>
+          <span aria-hidden="true">+</span>
+        </summary>
+        <div class="deep-dive-content">
+
+      <section class="sources-section" id="sources">
+        <div class="section-shell sources-layout">
+          <div class="sources-intro">
+            <p class="eyebrow"><span></span> Receipts, not rumors</p>
+            <h2>Every claim should lead back to the record.</h2>
+            <p>
+              Clarity for US will preserve the original source link, retrieval date, coverage limits, and any transformation applied. Plain-English summaries explain records; they never replace them.
+            </p>
+            <div class="standard-list">
+              <div><span>01</span><p><strong>Source first</strong>Link to the filing, bill text, executive order, roll call, docket, or opinion.</p></div>
+              <div><span>02</span><p><strong>Show uncertainty</strong>Label missing, delayed, disputed, and estimated information.</p></div>
+              <div><span>03</span><p><strong>No guilt by graph</strong>Connections show disclosed relationships—not proof of wrongdoing.</p></div>
+              <div><span>04</span><p><strong>Fact versus analysis</strong>AI labels what the text says, what outside evidence reports, and what the system infers.</p></div>
+            </div>
+          </div>
+          <div class="source-ledger" aria-label="Planned official data sources">
+            <div class="ledger-header"><span>PUBLIC SOURCE LEDGER</span><span>FEDERAL MVP</span></div>
+            <a href="https://www.fec.gov/data/" target="_blank" rel="noreferrer">
+              <span class="source-code">FEC</span><span><strong>Federal Election Commission</strong><small>Candidates, committees, contributions, outside spending, and inaugural committee filings</small></span><b>↗</b>
+            </a>
+            <a href="https://www.federalregister.gov/presidential-documents/executive-orders" target="_blank" rel="noreferrer">
+              <span class="source-code">FR</span><span><strong>Federal Register</strong><small>Executive orders, presidential documents, official text, dates, and citations</small></span><b>↗</b>
+            </a>
+            <a href="https://www.congress.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">CONG</span><span><strong>Congress.gov</strong><small>Bills, sponsors, actions, summaries, official text</small></span><b>↗</b>
+            </a>
+            <a href="https://www.cbo.gov/cost-estimates" target="_blank" rel="noreferrer">
+              <span class="source-code">CBO</span><span><strong>Congressional Budget Office</strong><small>Cost estimates, budget effects, mandates, and stated assumptions</small></span><b>↗</b>
+            </a>
+            <a href="https://lda.senate.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">LDA</span><span><strong>Lobbying Disclosure Act database</strong><small>Registrants, clients, issue areas, lobbying activity, and contribution reports</small></span><b>↗</b>
+            </a>
+            <a href="https://www.usaspending.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">USA$</span><span><strong>USAspending</strong><small>Federal contracts, grants, recipients, agencies, and award amounts</small></span><b>↗</b>
+            </a>
+            <a href="https://clerk.house.gov/Votes" target="_blank" rel="noreferrer">
+              <span class="source-code">HOUSE</span><span><strong>U.S. House Clerk</strong><small>Roll-call votes and member positions</small></span><b>↗</b>
+            </a>
+            <a href="https://www.senate.gov/legislative/votes_new.htm" target="_blank" rel="noreferrer">
+              <span class="source-code">SEN</span><span><strong>U.S. Senate</strong><small>Roll-call votes and vote summaries</small></span><b>↗</b>
+            </a>
+            <a href="https://www.supremecourt.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">SCOTUS</span><span><strong>Supreme Court of the United States</strong><small>Dockets, calendars, briefs, arguments, opinions</small></span><b>↗</b>
+            </a>
+            <a href="https://pacer.uscourts.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">PACER</span><span><strong>Federal court records</strong><small>District and appellate dockets, filings, orders, and case status; access limitations disclosed</small></span><b>↗</b>
+            </a>
+            <a href="https://www.courtlistener.com/recap/" target="_blank" rel="noreferrer">
+              <span class="source-code">RECAP</span><span><strong>CourtListener / RECAP</strong><small>Searchable federal docket and filing metadata; matches remain unverified until the underlying filing is reviewed</small></span><b>↗</b>
+            </a>
+            <a href="https://www.govinfo.gov/" target="_blank" rel="noreferrer">
+              <span class="source-code">GPO</span><span><strong>GovInfo</strong><small>Authenticated official publications and bill text</small></span><b>↗</b>
+            </a>
+            <a href="https://www.gsa.gov/about-gsa/mission-and-background/our-role-in-presidential-transitions" target="_blank" rel="noreferrer">
+              <span class="source-code">GSA</span><span><strong>Presidential Transition Directory</strong><small>Transition law, federal support, ethics plans, and public transition materials</small></span><b>↗</b>
+            </a>
+            <div class="coverage-gap">
+              <span class="source-code">GAP</span><span><strong>Presidential-library donations</strong><small>No uniform federal donor-disclosure dataset. Voluntary disclosures will be labeled incomplete and source-specific.</small></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="roadmap-section section-shell" id="roadmap">
+        <div class="section-heading heading-row">
+          <div>
+            <p class="eyebrow"><span></span> Build in public</p>
+            <h2>A credible path from prototype to public utility.</h2>
+          </div>
+          <p>
+            The old projects proved the need. This unified build creates one data model, one interface, and one evidence standard.
+          </p>
+        </div>
+        <div class="roadmap-grid">
+          <article class="roadmap-card now">
+            <span class="phase">NOW · FOUNDATION</span>
+            <h3>One Clarity for US experience</h3>
+            <ul>
+              <li>Unified navigation and cross-search</li>
+              <li>Ten connected record types</li>
+              <li>Relationship-trace interface</li>
+              <li>Required “Who benefits?” analysis lens</li>
+              <li>Public source and methodology standard</li>
+              <li>Current House roster and roll-call ingestion</li>
+              <li>Federal Register executive-order ingestion</li>
+              <li>Congress.gov bills, sponsors, actions, and text links</li>
+              <li>FEC candidate, committee, and itemized money ingestion</li>
+              <li>FEC Super PAC classification and Schedule E outside spending</li>
+              <li>Alias and official-ID search with visible coverage limits</li>
+              <li>Cross-linked election and campaign-finance records</li>
+              <li>Owner-triggered, source-grounded AI bill explanations</li>
+            </ul>
+          </article>
+          <article class="roadmap-card next">
+            <span class="phase">NEXT · LIVE FEDERAL DATA</span>
+            <h3>Broaden records and verification</h3>
+            <ul>
+              <li>House committee assignments and historic terms</li>
+              <li>Presidential campaign and inaugural funding views</li>
+              <li>CourtListener docket discovery and human verification workflow</li>
+              <li>Expanded AI coverage, review, and correction workflow</li>
+              <li>Certified ballot status and election results</li>
+              <li>Source freshness, corrections, and audit trail</li>
+            </ul>
+          </article>
+          <article class="roadmap-card later">
+            <span class="phase">THEN · THE FULL PICTURE</span>
+            <h3>Courts, states, alerts, and exports</h3>
+            <ul>
+              <li>Federal lawsuits, appeals, and Supreme Court opinions</li>
+              <li>Transition funding and presidential-library disclosure map</li>
+              <li>Kansas, then state-by-state expansion</li>
+              <li>Saved topics and public-record alerts</li>
+              <li>CSV/JSON exports and a public API</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+        </div>
+      </details>
+
+      <section class="about-section" id="about">
+        <div class="section-shell about-layout">
+          <div>
+            <p class="eyebrow"><span></span> Clarity belongs to all of us</p>
+            <h2>Free civic technology for an informed public.</h2>
+          </div>
+          <div>
+            <p>
+              Clarity for US is a 501(c)(3) nonprofit building nonpartisan tools that make government records understandable, connected, and useful. We do not tell people what to think. We make it harder for public power to hide behind complexity.
+            </p>
+            <a class="button button-primary" href="#explore">Start exploring <span>↗</span></a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-shell footer-grid">
+        <a class="brand footer-brand" href="#top">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span class="brand-copy"><strong>CLARITY</strong><small>FOR US</small></span>
+        </a>
+        <p>See the system clearly. Act with insight.</p>
+        <nav aria-label="Footer navigation">
+          <a href="#explore">Search</a><a href="#methodology">How it works</a><a href="#sources-roadmap">Sources &amp; roadmap</a>
+        </nav>
+        <small>© <span id="year"></span> Clarity for US · Nonpartisan · Open government, made legible.</small>
+      </div>
+    </footer>
+
+    <dialog class="record-dialog" id="record-dialog" aria-labelledby="dialog-title">
+      <button class="dialog-close" type="button" aria-label="Close record">×</button>
+      <div id="dialog-content"></div>
+    </dialog>
+  </body>
+</html>
