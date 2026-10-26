@@ -74,6 +74,7 @@ with TemporaryDirectory(prefix="d1-audit-test-") as temp:
     mismatched["entities"] += 1
     baseline_file.write_text(json.dumps({"tables": mismatched}))
     code, result = invoke(export, baseline_file)
+    assert code == 2 and result["status"] == "BASELINE_MISMATCH", result
     assert result["baseline_count_mismatches"].get("entities"), result
     assert not result["counts_match_independent_baseline"], result
 
