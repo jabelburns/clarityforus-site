@@ -38,5 +38,9 @@ jobs:
           pnpm run test:ingestion
       - name: Lint
         run: pnpm run lint
+      - name: Create disposable CI-only Sites hosting metadata
+        run: |
+          mkdir -p .openai
+          printf '%s\\n' '{"d1":"DB","r2":null}' > .openai/hosting.json
       - name: Build staging source without deployment
         run: pnpm run build
