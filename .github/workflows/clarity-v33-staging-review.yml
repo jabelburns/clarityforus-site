@@ -1,0 +1,42 @@
+name: Clarity v33.1 isolated staging review
+
+on:
+  push:
+    branches:
+      - codex/v33-1-ci-review-2026-10-26
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: site-source/source
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned packages (no production bindings)
+        run: |
+          npm install --global pnpm@11.25.0
+          pnpm install --frozen-lockfile
+      - name: Feature, security and ingestion regression tests
+        run: |
+          pnpm run test:vision
+          pnpm run test:senate
+          pnpm run test:bill-versions
+          pnpm run test:graph
+          pnpm run test:campaign
+          node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
+          pnpm run test:ingestion
+      - name: Lint
+        run: pnpm run lint
+      - name: Build staging source without deployment
+        run: pnpm run build
