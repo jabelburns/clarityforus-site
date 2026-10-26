@@ -36,6 +36,10 @@ jobs:
           pnpm run test:campaign
           node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
           pnpm run test:ingestion
+      - name: Synthetic D1 SQL regression checks (no production data)
+        run: |
+          python3 tests/house-bulk-sql.py
+          python3 tests/campaign-finance-sql.py
       - name: Lint
         run: pnpm run lint
       - name: Create disposable CI-only Sites hosting metadata
