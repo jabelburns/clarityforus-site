@@ -118,7 +118,8 @@ def audit(sql_file, expected_count_file=None):
         "isolated_restore_passed": restored,
         "counts_match_independent_baseline": bool(counts_match),
         "status": ("RESTORE_AND_COUNTS_MATCHED" if restored and counts_match
-                   else "RESTORE_ONLY_BASELINE_UNVERIFIED" if restored
+                   else "RESTORE_ONLY_BASELINE_UNVERIFIED" if restored and not expected_count_file
+                   else "BASELINE_MISMATCH" if restored
                    else "RESTORE_FAILED"),
         "warning": (
             "Counts matching alone does not prove an atomic snapshot. Verify "
@@ -142,7 +143,8 @@ def main():
         if args.report:
             args.report.write_text(encoded + "\n", encoding="utf-8")
         print(encoded)
-        return 0 if result["isolated_restore_passed"] else 2
+        return 0 if (result["isolated_restore_passed"] and
+                     (args.expected_counts is None or result["counts_match_independent_baseline"])) else 2
     except (OSError, sqlite3.Error, ValueError, RuntimeError) as exc:
         print(json.dumps({"status": "RESTORE_FAILED",
                           "error_type": type(exc).__name__,
