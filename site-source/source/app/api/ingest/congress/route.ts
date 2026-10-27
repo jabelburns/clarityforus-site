@@ -544,6 +544,17 @@ export async function POST(request: Request) {
       const results = [];
       for (const bundle of bundles) results.push(await writeBill(bundle, now));
 
+      // A partial cosponsor page must fail the direct ingest call as well as
+      // backfill; the unattended writer cannot mistake incomplete links for a
+      // successful full bill refresh. Existing source records can be retried.
+      const incompleteCosponsors = results.flatMap((row) =>
+        row.endpointErrors.filter((message) => message.startsWith("cosponsors:")),
+      );
+      if (incompleteCosponsors.length) {
+        throw new Error("Congress.gov cosponsors incomplete; retry this bill page. " +
+          incompleteCosponsors.join("; ").slice(0, 500));
+      }
+
       await db
         .update(ingestRuns)
         .set({
