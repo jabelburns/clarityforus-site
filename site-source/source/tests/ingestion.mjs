@@ -239,11 +239,14 @@ await test('Congress incomplete cosponsor page holds backfill cursor for retry',
   failCosponsorLaterPage = true;
   seedJob('congress', '119', { offset: 55 });
   const before = row('congress');
+  const direct = await post(api.congress, 'congress?congress=119&offset=55&limit=1');
+  assert.equal(direct.response.status, 500);
+  assert.match(direct.body.error, /cosponsors incomplete.*HTTP 503/);
   const result = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(result.response.status, 500);
   assert.equal(result.body.ok, false);
-  assert.equal(result.body.status, 'retry');
-  assert.equal(result.body.batch.partialEndpointErrors.length, 1);
-  assert.match(result.body.batch.partialEndpointErrors[0], /cosponsors: Congress.gov returned HTTP 503/);
+  assert.match(result.body.error, /cosponsors incomplete.*HTTP 503/);
+  assert.equal(row('congress').status, 'failed');
   assert.equal(row('congress').cursor, before.cursor);
   assert.equal(row('congress').batches_completed, before.batches_completed);
   assert.match(row('congress').last_error, /cosponsors/);
