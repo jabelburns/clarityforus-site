@@ -34,7 +34,7 @@ pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --ye
 
 # Execute the same 23-table read-only inventory SQL that an authorized Site
 # session could use to measure a future complete production count baseline.
-pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json \\
+pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json \
   --json --file tools/d1_readonly_23_counts.sql > "$work/local-counts.json"
 python3 - "$work/local-counts.json" <<'PY'
 import json
