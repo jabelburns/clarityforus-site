@@ -36,6 +36,8 @@ jobs:
           pnpm run test:campaign
           node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
           pnpm run test:ingestion
+          node --test tests/house-query-budget.mjs
+          node tools/audit-house-query-budget.mjs
       - name: Synthetic D1 SQL regression checks (no production data)
         run: |
           python3 tests/house-bulk-sql.py
