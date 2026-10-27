@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     const warnings = batchWarnings(body);
     // An enrichment failure must be retried before moving past the raw page.
     // Keep its frozen date even on retry so a day boundary cannot shift it.
-    const retry = warnings.length > 0 && (dataset === "fec" || dataset === "outside-spending");
+    const retry = warnings.length > 0 && (dataset === "congress" || dataset === "fec" || dataset === "outside-spending");
     const next = retry
       ? { ...cursor, ...(typeof body.maxDate === "string" ? { maxDate: body.maxDate } : {}) }
       : progress.next;
