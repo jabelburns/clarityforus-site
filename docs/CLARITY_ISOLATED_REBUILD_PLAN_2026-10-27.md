@@ -87,3 +87,18 @@ An independently controlled scheduler for new staging (such as a platform native
 | Production release | **NO-GO** |
 
 This strategy does not claim zero historical data loss. It separates rebuilding reproducible public records from recovery of the prior database's private and manual state.
+
+
+## Oct 27 local Worker House integration — PASS, production budget still OPEN
+
+The review-only test harness now takes the **three exact JSON1 bulk INSERTs** from `app/api/ingest/house-votes/route.ts`, replaces each Drizzle JSON interpolation with one bound parameter, and executes the SQL in a **local Wrangler Worker** using `env.DB.prepare(sql).bind(JSON.stringify(records)).run()`. This is a more faithful check than a 435-row SQL literal: Cloudflare's Wrangler CLI correctly rejected that oversized literal as a different statement-execution path.
+
+- [Verified green Actions run #40559115779](https://github.com/jabelburns/clarityforus-site/actions/runs/40559115779), pinned Wrangler 4.92.0 with local-runtime-compatible test date 2026-05-22.
+- Uses 435 **fictional** person identifiers and vote positions, not real Congress/FEC records.
+- First import and idempotent replay both succeed; count remains 435 positions/435 member IDs; a corrected vote and changed official URL update; a stale rerun display name is ignored.
+- A synthetic failed backfill job retains its prior JSON cursor; this is a database persistence fixture, not a full test of the live backfill handler's failure path (the separate Node ingestion suite covers application cursor logic).
+- The enlarged local D1 is exported using `wrangler d1 export --local`, restored offline and checked for 23 tables, exact synthetic row counts, indexes and foreign-key integrity.
+- All CI access is to a disposable **all-zero UUID** local D1 binding on loopback; there are no real service credentials, network publisher calls or production data.
+- `tools/generate_synthetic_house_d1_replay.py` creates the fixture Worker at runtime; that test Worker is never part of the application build/deployment.
+
+**Limitations:** Three bound bulk statements per Worker invocation pass. This does **not** measure every D1 query across the actual HTTP route's metadata upserts, ingest run logging, authorization, and error handling or simulate downstream official House Clerk API latency; total per-invocation D1 query-budget validation on a separate real D1 staging Worker remains an open gate. The remote staging environment and full official-data reingestion have not begun.
