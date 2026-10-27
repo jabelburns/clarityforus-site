@@ -101,7 +101,7 @@ import sys
 Path(sys.argv[1]).write_text(json.dumps({
   "name": "clarity-fictional-house-ci",
   "main": sys.argv[2],
-  "compatibility_date": "2026-10-27",
+  "compatibility_date": "2026-05-22",
   "d1_databases": [{
     "binding": "DB", "database_name": "DB",
     "database_id": "00000000-0000-4000-8000-000000000000"
