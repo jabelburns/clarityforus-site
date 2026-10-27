@@ -97,16 +97,17 @@ VALUES ('source:house:synthetic:2026:1','synthetic','house_roll_call',
         'CI fixture','Fictional House Roll 1','https://example.org/fictional-vote/1');
 INSERT INTO entities (id,entity_type,canonical_name,normalized_name)
 VALUES ('bill:synthetic:119:hr:1','bill','Fictional HR1','fictional hr1');
-INSERT INTO bills (entity_id,congress,bill_type,bill_number,title,source_id)
+INSERT INTO bills (entity_id,congress,bill_type,bill_number,title,official_url,source_id)
 VALUES ('bill:synthetic:119:hr:1',119,'hr',1,'Fictional HR1',
-        'source:house:synthetic:2026:1');
+        'https://example.org/fictional-bills/1','source:house:synthetic:2026:1');
 INSERT INTO entities (id,entity_type,canonical_name,normalized_name)
 VALUES ('vote:house:synthetic:119:2:1','vote','Fictional House Roll 1',
         'fictional house roll 1');
 INSERT INTO votes (entity_id,congress,chamber,session,roll_number,vote_date,
-                   bill_entity_id,source_id)
+                   bill_entity_id,official_url,source_id)
 VALUES ('vote:house:synthetic:119:2:1',119,'House','2',1,'2026-10-27',
-        'bill:synthetic:119:hr:1','source:house:synthetic:2026:1');
+        'bill:synthetic:119:hr:1','https://example.org/fictional-vote/1',
+        'source:house:synthetic:2026:1');
 INSERT INTO relationships (id,from_entity_id,to_entity_id,relationship_type,source_id)
 VALUES ('relation:house:synthetic:1','vote:house:synthetic:119:2:1',
         'bill:synthetic:119:hr:1','concerns','source:house:synthetic:2026:1');
