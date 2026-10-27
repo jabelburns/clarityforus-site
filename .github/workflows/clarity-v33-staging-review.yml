@@ -49,3 +49,5 @@ jobs:
           printf '%s\n' '{"d1":"DB","r2":null}' > .openai/hosting.json
       - name: Build staging source without deployment
         run: pnpm run build
+      - name: Native Wrangler local D1 export and isolated restore (synthetic only)
+        run: bash scripts/ci-local-d1-roundtrip.sh
