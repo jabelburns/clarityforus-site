@@ -1,97 +1,73 @@
 #!/usr/bin/env python3
-"""Produce LOCAL-ONLY D1 SQL that replays production House bulk inserts.
+"""Create a LOCAL-ONLY Worker fixture from the real House JSON1 bulk SQL.
 
-No network access, external credentials or live records. Extracts the exact
-three parameterized JSON1 INSERTs from app/api/ingest/house-votes/route.ts,
-binds 435 entirely fictitious records and emits first-pass and replay SQL.
-Never use generated SQL with a remote database or a real D1 binding.
+Do not inline the 435-member JSON array into SQL; use one bound D1 value per
+statement in a local Worker, exactly as the route does. No private data,
+credentials, external fetches, or remote/cloud databases.
 """
 import json
 from pathlib import Path
 import re
 import sys
 
-
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "app/api/ingest/house-votes/route.ts"
-EXPECTED_BINDINGS = {
+HOUSE_ROUTE = ROOT / "app/api/ingest/house-votes/route.ts"
+EXPECTED = {
     "entities": "voterEntityRows",
     "external_ids": "voterIdentifiers",
     "member_votes": "memberVoteRows",
 }
 VOTE_ID = "vote:house:synthetic:119:2:1"
 SOURCE_ID = "source:house:synthetic:2026:1"
-BILL_ID = "bill:synthetic:119:hr:1"
 
 
-def quote_sql(value):
-    return "'" + value.replace("'", "''") + "'"
-
-
-def extract_statements():
-    source = SOURCE.read_text(encoding="utf-8")
-    expressions = re.findall(r"await db\.run\(sql`(INSERT INTO .*?)`\);", source, re.S)
-    if len(expressions) != 3:
-        raise ValueError("House route must contain exactly 3 production JSON1 bulk INSERTs")
-    result = {}
-    for expression in expressions:
-        match = re.search(r"INSERT INTO (entities|external_ids|member_votes)\b", expression)
+def production_bulk_statements():
+    route = HOUSE_ROUTE.read_text(encoding="utf-8")
+    tick = chr(96)
+    exprs = re.findall(r"await db\.run\(sql" + tick + r"(INSERT INTO.*?)" + tick + r"\);", route, re.S)
+    if len(exprs) != 3:
+        raise ValueError("Expected exactly three House bulk SQL statements")
+    bound = {}
+    for expr in exprs:
+        match = re.search(r"INSERT INTO (entities|external_ids|member_votes)\b", expr)
         if not match:
-            raise ValueError("Unexpected bulk insert target")
+            raise ValueError("Unrecognized bulk SQL target")
         target = match.group(1)
-        variable = EXPECTED_BINDINGS[target]
-        placeholder = "${JSON.stringify(" + variable + ")}"
-        if expression.count("${") != 1 or expression.count(placeholder) != 1:
-            raise ValueError("House bulk INSERT changed: no longer a single JSON bind for " + target)
-        result[target] = (expression, placeholder)
-    if set(result) != set(EXPECTED_BINDINGS):
-        raise ValueError("All three expected bulk targets are required")
-    return result
+        token = chr(36) + "{JSON.stringify(" + EXPECTED[target] + ")}"
+        if expr.count(chr(36) + "{") != 1 or expr.count(token) != 1:
+            raise ValueError("House SQL must have exactly one bound JSON array")
+        bound[target] = expr.replace(token, "?")
+    if set(bound) != set(EXPECTED):
+        raise ValueError("Missing expected House bulk statement")
+    return bound
 
 
-def records():
+def fixture_rows():
     now = "2026-10-27T00:00:00.000Z"
-    entities = []
-    identities = []
-    positions = []
+    entities, ids, positions = [], [], []
     for index in range(435):
-        bio = f"Z{index:06d}"
-        entity_id = f"person:bioguide:{bio}"
-        display = f"Fictional House Member {index:03d}"
+        code = f"Z{index:06d}"
+        person = f"person:bioguide:{code}"
+        name = f"Fictional House Member {index:03d}"
         entities.append({
-            "id": entity_id, "entityType": "politician", "canonicalName": display,
-            "normalizedName": display.lower(), "jurisdictionLevel": "federal",
-            "stateCode": "KS", "description": "Fictional fixture; not an actual legislator",
+            "id": person, "entityType": "politician", "canonicalName": name,
+            "normalizedName": name.lower(), "jurisdictionLevel": "federal",
+            "stateCode": "KS", "description": "Fictional test record",
             "status": "recorded_member", "updatedAt": now,
         })
-        identities.append({
-            "entityId": entity_id, "sourceSystem": "house_clerk",
-            "externalId": bio,
-            "officialUrl": f"https://example.org/fictional-members/{bio}",
+        ids.append({
+            "entityId": person, "sourceSystem": "house_clerk", "externalId": code,
+            "officialUrl": f"https://example.org/fictional-member/{code}",
             "isPrimary": True, "verifiedAt": now,
         })
         positions.append({
-            "id": f"{VOTE_ID}:{bio}", "voteEntityId": VOTE_ID,
-            "personEntityId": entity_id, "position": "Yea", "sourceId": SOURCE_ID,
+            "id": VOTE_ID + ":" + code, "voteEntityId": VOTE_ID,
+            "personEntityId": person, "position": "Yea", "sourceId": SOURCE_ID,
         })
-    return entities, identities, positions
+    return {"entities": entities, "external_ids": ids, "member_votes": positions}
 
 
-def expand(statements, entries):
-    sql = []
-    for name in EXPECTED_BINDINGS:
-        template, placeholder = statements[name]
-        payload = json.dumps(entries[name], separators=(",", ":"), ensure_ascii=True)
-        if len(payload) >= 400_000:
-            raise ValueError("Fixture exceeded conservative JSON size envelope")
-        sql.append(template.replace(placeholder, quote_sql(payload)) + ";")
-    return "\n".join(sql)
-
-
-def make_files(first_path, replay_path):
-    statements = extract_statements()
-    entities, identities, positions = records()
-    initial = """-- GENERATED CI fixture. D1 --local ONLY. Never use with production.
+BASE_SQL = """-- Fictional CI fixture; never use against remote D1.
 INSERT INTO sources (id,source_system,record_type,publisher,title,url)
 VALUES ('source:house:synthetic:2026:1','synthetic','house_roll_call',
         'CI fixture','Fictional House Roll 1','https://example.org/fictional-vote/1');
@@ -115,37 +91,60 @@ INSERT INTO backfill_jobs (id,dataset,scope,status,cursor)
 VALUES ('backfill:house-votes:synthetic','house-votes','synthetic','running',
         '{"year":2026,"beforeRoll":100}');
 """
-    first = {"entities": entities, "external_ids": identities, "member_votes": positions}
-    first_path.write_text(initial + "\n" + expand(statements, first) + "\n", encoding="utf-8")
 
-    # Source-vote corrections must be reflected; existing nonempty member names
-    # must never be replaced by a stale rerun display name.
-    entities[0]["canonicalName"] = "Wrong stale display name"
-    identities[0]["officialUrl"] = "https://example.org/fictional-members/Z000000-corrected"
-    positions[0]["position"] = "Nay"
-    replay = {
-        "entities": entities, "external_ids": identities, "member_votes": positions
+
+def generate(base, worker):
+    sql = production_bulk_statements()
+    data = fixture_rows()
+    base.write_text(BASE_SQL, encoding="utf-8")
+    code = """// GENERATED LOCAL CI WORKER; never deploy.
+const statements = """ + json.dumps(sql, separators=(",", ":")) + """;
+const fixtures = """ + json.dumps(data, separators=(",", ":")) + """;
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const step = url.searchParams.get("step");
+    if (request.method !== "POST" || url.pathname !== "/__ci__/house" ||
+        !["initial", "replay"].includes(step)) {
+      return Response.json({ error: "Unknown CI action" }, { status: 404 });
     }
-    replay_path.write_text(
-        "-- CI idempotent replay and synthetic failed-cursor test. D1 --local ONLY.\n"
-        + expand(statements, replay)
-        + """\nUPDATE backfill_jobs
-SET status = 'failed', last_error = 'Synthetic simulated batch failure'
-WHERE id = 'backfill:house-votes:synthetic';
-""",
-        encoding="utf-8",
-    )
+    if (!env.DB) return Response.json({ error: "Missing local DB" }, { status: 503 });
+    try {
+      for (const target of ["entities", "external_ids", "member_votes"]) {
+        const rows = [...fixtures[target]];
+        if (step === "replay") {
+          rows[0] = { ...rows[0] };
+          if (target === "entities") rows[0].canonicalName = "Wrong stale name";
+          if (target === "external_ids") rows[0].officialUrl =
+            "https://example.org/fictional-member/Z000000-corrected";
+          if (target === "member_votes") rows[0].position = "Nay";
+        }
+        await env.DB.prepare(statements[target]).bind(JSON.stringify(rows)).run();
+      }
+      if (step === "replay") {
+        await env.DB.prepare(
+          "UPDATE backfill_jobs SET status='failed', last_error='Simulated failure' " +
+          "WHERE id='backfill:house-votes:synthetic'"
+        ).run();
+      }
+      return Response.json({ ok: true, step, bulkQueries: 3, positions: 435 });
+    } catch (e) {
+      return Response.json({ ok: false, error: String(e) }, { status: 500 });
+    }
+  }
+};
+"""
+    worker.write_text(code, encoding="utf-8")
+    print("PASS: generated local bound-parameter Worker fixture for 435 fictional positions")
 
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: generate_synthetic_house_d1_replay.py FIRST.sql REPLAY.sql")
-    first = Path(sys.argv[1])
-    replay = Path(sys.argv[2])
-    if first.resolve() == replay.resolve():
-        raise SystemExit("First-pass and replay fixture paths must differ")
-    make_files(first, replay)
-    print("PASS: generated 435 fictional House vote positions from production JSON1 SQL")
+        raise SystemExit("Usage: generate_synthetic_house_d1_replay.py BASE.sql WORKER.mjs")
+    base, worker = Path(sys.argv[1]), Path(sys.argv[2])
+    if base.resolve() == worker.resolve():
+        raise ValueError("Output files must be distinct")
+    generate(base, worker)
 
 
 if __name__ == "__main__":
