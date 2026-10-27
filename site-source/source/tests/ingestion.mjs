@@ -42,7 +42,7 @@ const d1 = {
 globalThis.__ingestTestEnv = { DB: d1, INGEST_TOKEN: 'test-only', FEC_API_KEY: 'test-only', CONGRESS_API_KEY: 'test-only' };
 const output = await build({
   stdin: {
-    contents: `export * from './lib/fec.ts'; export * from './lib/ingest-progress.ts'; export { POST as backfill } from './app/api/ingest/backfill/route.ts'; export { POST as houseVotes } from './app/api/ingest/house-votes/route.ts';`,
+    contents: `export * from './lib/fec.ts'; export * from './lib/ingest-progress.ts'; export { POST as backfill } from './app/api/ingest/backfill/route.ts'; export { POST as houseVotes } from './app/api/ingest/house-votes/route.ts'; export { POST as congress } from './app/api/ingest/congress/route.ts';`,
     resolveDir: process.cwd(), loader: 'ts',
   },
   bundle: true, platform: 'node', format: 'esm', write: false,
@@ -179,7 +179,26 @@ await test('Bounded Congress retry handles 100 cosponsors without losing relatio
   assert.equal(result.body.ok, true, JSON.stringify(result.body));
   assert.equal(result.body.cursor.offset, 21);
   assert.equal(result.body.batch.sponsorsLinked, 100);
+  assert.ok(result.queries <= 50, "Congress backfill must fit the D1 Free query budget; saw " + result.queries);
+  console.log("Congress backfill query count (mock D1): " + result.queries);
   assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare("select count(*) n from relationships where relationship_type='cosponsored'").get().n, 100);
+});
+await test('Congress reimport preserves curated member identity and idempotent sponsorships', async () => {
+  const curated = 'person:bioguide:T000000';
+  sqlite.prepare('update entities set canonical_name = ? where id = ?').run('Reviewed Legislator Name', curated);
+  const first = await post(api.congress, 'congress?congress=119&offset=20&limit=1');
+  assert.equal(first.body.ok, true, JSON.stringify(first.body));
+  assert.ok(first.queries <= 50, 'Congress direct import exceeded 50 D1 queries: ' + first.queries);
+  assert.equal(sqlite.prepare('select canonical_name from entities where id = ?').get(curated).canonical_name, 'Reviewed Legislator Name');
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare("select count(*) n from external_ids where source_system='congress_gov' and entity_id like 'person:bioguide:%'").get().n, 100);
+  const repeat = await post(api.congress, 'congress?congress=119&offset=20&limit=1');
+  assert.equal(repeat.body.ok, true, JSON.stringify(repeat.body));
+  assert.ok(repeat.queries <= 50, 'Congress replay exceeded 50 D1 queries: ' + repeat.queries);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare('select canonical_name from entities where id = ?').get(curated).canonical_name, 'Reviewed Legislator Name');
+  console.log('Direct Congress import/replay mock D1 queries: ' + first.queries + '/' + repeat.queries);
 });
 await test('House batches preserve official bill details and all member positions', async () => {
   const result = await post(api.houseVotes, 'house-votes?year=2026&limit=25');
