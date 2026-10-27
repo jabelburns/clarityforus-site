@@ -53,6 +53,8 @@ const output = await build({
 });
 const api = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text).toString('base64')}`);
 let failEnrichment = false;
+let cosponsorTotal = 100;
+let failCosponsorLaterPage = false;
 let unexpectedFetch = false;
 const fetched = [];
 const json = (value) => Response.json(value);
@@ -82,7 +84,23 @@ globalThis.fetch = async (input) => {
     return json({ bills: offset > 900 ? [] : [{ congress: 119, type: 'HR', number: '55', title: 'Complete official title' }] });
   }
   if (path === '/v3/bill/119/hr/55') return json({ bill: { title: 'Complete official title', introducedDate: '2026-01-01', sponsors: [] } });
-  if (path.endsWith('/cosponsors')) return json({ cosponsors: Array.from({ length: 100 }, (_, i) => ({ bioguideId: `T${String(i).padStart(6, '0')}`, firstName: `Member ${i}`, lastName: 'Test', state: 'KS' })) });
+  if (path.endsWith('/cosponsors')) {
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    if (failCosponsorLaterPage && offset >= 250) return new Response('temporary upstream error', { status: 503 });
+    const count = Math.max(0, Math.min(limit, cosponsorTotal - offset));
+    return json({
+      cosponsors: Array.from({ length: count }, (_, i) => {
+        const member = offset + i;
+        return { bioguideId: `T${String(member).padStart(6, '0')}`, firstName: `Member ${member}`, lastName: 'Test', state: 'KS' };
+      }),
+      pagination: {
+        count: cosponsorTotal,
+        countIncludingWithdrawnCosponsors: cosponsorTotal,
+        next: offset + count < cosponsorTotal ? 'https://api.congress.gov/v3/bill/119/hr/55/cosponsors?offset=' + (offset + count) : null,
+      },
+    });
+  }
   if (path.endsWith('/committees')) return json({ committees: [{ systemCode: 'hsed00', name: 'Education and Workforce Committee', chamber: 'House', type: 'Standing' }] });
   for (const key of ['actions', 'summaries', 'text', 'amendments']) if (path.endsWith(`/${key}`)) return json({ [key]: [] });
   if (url.hostname === 'clerk.house.gov' && path === '/Votes/MemberVotes') return new Response('<a href="/Votes/2026319">319</a><a href="/Votes/2026318">318</a>');
@@ -199,6 +217,42 @@ await test('Congress reimport preserves curated member identity and idempotent s
   assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
   assert.equal(sqlite.prepare('select canonical_name from entities where id = ?').get(curated).canonical_name, 'Reviewed Legislator Name');
   console.log('Direct Congress import/replay mock D1 queries: ' + first.queries + '/' + repeat.queries);
+});
+await test('Congress cosponsor pagination ingests beyond first 100 and stays within D1 budget', async () => {
+  cosponsorTotal = 300;
+  const before = fetched.length;
+  const result = await post(api.congress, 'congress?congress=119&offset=25&limit=1');
+  assert.equal(result.body.ok, true, JSON.stringify(result.body));
+  assert.equal(result.body.sponsorsLinked, 300);
+  assert.ok(result.queries <= 50, 'Paginated Congress 300-member import exceeded the D1 Free budget: ' + result.queries);
+  const requested = fetched.slice(before).filter((url) => url.pathname.endsWith('/cosponsors'));
+  assert.deepEqual(requested.map((url) => Number(url.searchParams.get('offset'))), [0, 250]);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 300);
+  assert.equal(sqlite.prepare("select count(*) n from relationships where relationship_type='cosponsored'").get().n, 300);
+  assert.equal(sqlite.prepare("select count(*) n from external_ids where source_system='congress_gov' and entity_id like 'person:bioguide:%'").get().n, 300);
+  assert.equal(sqlite.prepare("select canonical_name from entities where id='person:bioguide:T000000'").get().canonical_name, 'Reviewed Legislator Name');
+  console.log('Congress 300-cosponsor paginated import mock D1 queries: ' + result.queries);
+  cosponsorTotal = 100;
+});
+await test('Congress incomplete cosponsor page holds backfill cursor for retry', async () => {
+  cosponsorTotal = 300;
+  failCosponsorLaterPage = true;
+  seedJob('congress', '119', { offset: 55 });
+  const before = row('congress');
+  const result = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(result.body.ok, false);
+  assert.equal(result.body.status, 'retry');
+  assert.equal(result.body.batch.partialEndpointErrors.length, 1);
+  assert.match(result.body.batch.partialEndpointErrors[0], /cosponsors: Congress.gov returned HTTP 503/);
+  assert.equal(row('congress').cursor, before.cursor);
+  assert.equal(row('congress').batches_completed, before.batches_completed);
+  assert.match(row('congress').last_error, /cosponsors/);
+  failCosponsorLaterPage = false;
+  const resumed = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(resumed.body.ok, true, JSON.stringify(resumed.body));
+  assert.equal(JSON.parse(row('congress').cursor).offset, 56);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 300);
+  cosponsorTotal = 100;
 });
 await test('House batches preserve official bill details and all member positions', async () => {
   const result = await post(api.houseVotes, 'house-votes?year=2026&limit=25');
