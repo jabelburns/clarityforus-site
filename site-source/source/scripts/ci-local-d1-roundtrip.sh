@@ -84,14 +84,72 @@ assert result['table_counts']['relationships'] == 1, result
 print('PASS: local native D1 export restored with 23 expected tables and independent synthetic row counts.')
 PY
 
-# Exercise the *actual* 435-person House JSON1 bulk SQL on local Wrangler D1.
-# No HTTP handler, public API or real production D1 is invoked by this test.
+# Exercise the actual House JSON1 SQL with D1.prepare().bind() inside a
+# local-only Worker. Wrangler d1 execute with a 435-row *literal* is a
+# different SQL statement-length path, not how application code writes rows.
 python3 tools/generate_synthetic_house_d1_replay.py \
-  "$work/fictional-house-first.sql" "$work/fictional-house-replay.sql"
+  "$work/fictional-house-base.sql" "$work/fictional-house-worker.mjs"
 pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json \
-  --yes --file "$work/fictional-house-first.sql"
-pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json \
-  --yes --file "$work/fictional-house-replay.sql"
+  --yes --file "$work/fictional-house-base.sql"
+
+# CI-only Worker config contains no account credentials, no remote bindings,
+# and only the UUID already verified as the all-zero disposable placeholder.
+python3 - "$work/wrangler-house-ci.json" "$work/fictional-house-worker.mjs" <<'PY'
+import json
+from pathlib import Path
+import sys
+Path(sys.argv[1]).write_text(json.dumps({
+  "name": "clarity-fictional-house-ci",
+  "main": sys.argv[2],
+  "compatibility_date": "2026-10-27",
+  "d1_databases": [{
+    "binding": "DB", "database_name": "DB",
+    "database_id": "00000000-0000-4000-8000-000000000000"
+  }]
+}))
+PY
+
+# Must share the same local persistence path as the preceding --local executes.
+pnpm exec wrangler dev --local --config "$work/wrangler-house-ci.json" \
+  --ip 127.0.0.1 --port 8797 \
+  --persist-to "$(pwd)/dist/server/.wrangler/state" > "$work/worker.log" 2>&1 &
+worker_pid=$!
+trap 'kill "$worker_pid" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+
+if ! python3 - <<'PY'
+import json
+import time
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+
+base = "http://127.0.0.1:8797/__ci__/house?step="
+def invoke(step):
+    req = Request(base + step, data=b"{}", method="POST",
+                  headers={"content-type": "application/json"})
+    with urlopen(req, timeout=5) as response:
+        result = json.loads(response.read())
+    assert result == {
+        "ok": True, "step": step, "bulkQueries": 3, "positions": 435
+    }, result
+
+for attempt in range(50):
+    try:
+        invoke("initial")
+        break
+    except URLError as e:
+        if attempt == 49:
+            raise AssertionError("Local test Worker never became ready") from e
+        time.sleep(0.5)
+invoke("replay")
+print("PASS: isolated local Worker accepted 435 bound JSON records in three D1 statements per batch")
+PY
+then
+  echo "Local Worker error log follows:" >&2
+  tail -n 90 "$work/worker.log" >&2
+  exit 1
+fi
+kill "$worker_pid" >/dev/null 2>&1 || true
+wait "$worker_pid" 2>/dev/null || true
 
 cat > "$work/house-assertions.sql" <<'SQL'
 SELECT
