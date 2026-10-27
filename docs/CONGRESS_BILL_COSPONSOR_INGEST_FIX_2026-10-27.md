@@ -13,7 +13,7 @@
 - Sponsor and cosponsor graph upserts now use **four SQLite JSON1 statements per chunk**, with **200 sponsors per chunk** and one bound JSON parameter per statement. Current Bioguide-based identities and graph relationship IDs are unchanged. Non-null state/district refresh is retained; established member canonical names are not overwritten. Sponsor joined/withdrawn dates and evidence source are updated on replay.
 - Cosponsor endpoint fetch uses documented max **250 records per page**, bounded to at most four pages. It requests sequential offsets without blindly following untrusted `pagination.next` URLs. If an incomplete or stalled upstream page is detected, it emits an explicit source warning rather than accepting a truncated result. The complete retrieved set is included in the bill's raw source snapshot.
 - Congress backfill now treats `partialEndpointErrors` as a **retry condition**, retains the prior durable cursor, and records the partial error. A subsequent successful call may continue.
-- The route still writes other bill metadata when an optional endpoint is unavailable, so **the direct Congress ingestion response may still be `ok: true` with `partialEndpointErrors`**; independent unattended staging writers should reject and retry such partial results. A route-wide fail-closed policy for all optional endpoints should be reviewed before remote release.
+- Incomplete **cosponsor** pages now fail the direct Congress ingestion request with HTTP 500 and cause its ingest run to be marked failed; the backfill retains its existing cursor for the next attempt. Other optional endpoint errors remain explicitly reported as `partialEndpointErrors` and are retryable in the backfill path. A full fail-closed policy for all optional publisher endpoints still requires a separate product decision, because some resources are genuinely unavailable for older bills.
 
 ## CI evidence
 
@@ -22,7 +22,7 @@
 - 100-cosponsor Congress backfill completes using **16 simulated D1 queries** (including backfill bookkeeping) with all 100 sponsor records and edges.
 - 300-cosponsor bill requests offsets **0 and 250** and imports all 300 using **17 simulated D1 queries**.
 - Direct Congress import and replay with 100 members use **13 simulated D1 queries each**; no duplicate sponsors; curated member name preserved.
-- A synthetic **503 response on cosponsor page 2** causes partial metadata to be flagged and Congress backfill to retain its existing offset/batches; a subsequent retry advances and restores all 300 sponsor links.
+- A synthetic **503 response on cosponsor page 2** makes both direct ingestion and Congress backfill return HTTP 500; the backfill retains its existing offset/batches, and a subsequent retry advances and restores all 300 sponsor links.
 - 16 ingestion regressions, suite lint/build, 23-table local D1 schema inventory, House 435-position local Worker replay and native Wrangler local SQL export/restore all passed.
 
 **Caveat:** Source queries were measured with the Node SQLite-backed D1 adapter, not a live remote Cloudflare Worker. D1 query billing, runtime limits and other middleware/service interactions must be confirmed on an independently owned, nonproduction D1 service before launch.
