@@ -32,6 +32,23 @@ pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --ye
 pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --yes --file drizzle/0001_flippant_thunderbolt.sql
 pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --yes --file tests/fixtures/ci-local-d1-seed.sql
 
+# Execute the same 23-table read-only inventory SQL that an authorized Site
+# session could use to measure a future complete production count baseline.
+pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json \\
+  --json --file tools/d1_readonly_23_counts.sql > "$work/local-counts.json"
+python3 - "$work/local-counts.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+data = json.loads(Path(sys.argv[1]).read_text())
+rows = data[0]['results'] if isinstance(data, list) else data['results']
+counts = {row['table_name']: row['row_count'] for row in rows}
+assert len(rows) == len(counts) == 23, 'Inventory must return exactly 23 table counts'
+assert counts['entities'] == 2 and counts['relationships'] == 1, counts
+assert counts['sources'] == 1 and counts['backfill_jobs'] == 0, counts
+print('PASS: read-only 23-table D1 inventory matches synthetic seed.')
+PY
+
 # Create a fully independent, synthetic baseline using known seed cardinalities.
 python3 - "$work/baseline.json" <<'PY'
 import json
