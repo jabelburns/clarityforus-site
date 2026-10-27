@@ -1,28 +1,59 @@
--- READ-ONLY application table-count inventory for Clarity D1.
--- Generated from the TWO source v28 migrations; checks all 23 known app tables.
--- One SQL statement; never writes, triggers ingestion or reads row content.
--- This is NOT a backup. Failure may indicate missing tables / migration drift.
-SELECT 'analyses' AS table_name, COUNT(*) AS row_count FROM "analyses"
-UNION ALL SELECT 'analysis_findings' AS table_name, COUNT(*) AS row_count FROM "analysis_findings"
-UNION ALL SELECT 'backfill_jobs' AS table_name, COUNT(*) AS row_count FROM "backfill_jobs"
-UNION ALL SELECT 'bill_sponsors' AS table_name, COUNT(*) AS row_count FROM "bill_sponsors"
-UNION ALL SELECT 'bills' AS table_name, COUNT(*) AS row_count FROM "bills"
-UNION ALL SELECT 'candidacies' AS table_name, COUNT(*) AS row_count FROM "candidacies"
-UNION ALL SELECT 'case_challenges' AS table_name, COUNT(*) AS row_count FROM "case_challenges"
-UNION ALL SELECT 'committees' AS table_name, COUNT(*) AS row_count FROM "committees"
-UNION ALL SELECT 'court_cases' AS table_name, COUNT(*) AS row_count FROM "court_cases"
-UNION ALL SELECT 'elections' AS table_name, COUNT(*) AS row_count FROM "elections"
-UNION ALL SELECT 'entities' AS table_name, COUNT(*) AS row_count FROM "entities"
-UNION ALL SELECT 'entity_aliases' AS table_name, COUNT(*) AS row_count FROM "entity_aliases"
-UNION ALL SELECT 'executive_orders' AS table_name, COUNT(*) AS row_count FROM "executive_orders"
-UNION ALL SELECT 'external_ids' AS table_name, COUNT(*) AS row_count FROM "external_ids"
-UNION ALL SELECT 'ingest_runs' AS table_name, COUNT(*) AS row_count FROM "ingest_runs"
-UNION ALL SELECT 'member_votes' AS table_name, COUNT(*) AS row_count FROM "member_votes"
-UNION ALL SELECT 'money_transactions' AS table_name, COUNT(*) AS row_count FROM "money_transactions"
-UNION ALL SELECT 'offices' AS table_name, COUNT(*) AS row_count FROM "offices"
-UNION ALL SELECT 'relationships' AS table_name, COUNT(*) AS row_count FROM "relationships"
-UNION ALL SELECT 'site_settings' AS table_name, COUNT(*) AS row_count FROM "site_settings"
-UNION ALL SELECT 'source_records' AS table_name, COUNT(*) AS row_count FROM "source_records"
-UNION ALL SELECT 'sources' AS table_name, COUNT(*) AS row_count FROM "sources"
-UNION ALL SELECT 'votes' AS table_name, COUNT(*) AS row_count FROM "votes" 
-ORDER BY table_name;
+-- READ-ONLY exact count inventory for 23 known Clarity application tables.
+-- Source: 0000_amused_stature.sql + 0001_flippant_thunderbolt.sql.
+-- One SQL statement using VALUES + scalar counts, not a 23-way UNION ALL.
+-- It does not return row contents or change any data. It is NOT a backup.
+-- If any table is missing, the query fails instead of hiding schema drift.
+WITH table_names(table_name) AS (
+  VALUES
+    ('analyses'),
+    ('analysis_findings'),
+    ('backfill_jobs'),
+    ('bill_sponsors'),
+    ('bills'),
+    ('candidacies'),
+    ('case_challenges'),
+    ('committees'),
+    ('court_cases'),
+    ('elections'),
+    ('entities'),
+    ('entity_aliases'),
+    ('executive_orders'),
+    ('external_ids'),
+    ('ingest_runs'),
+    ('member_votes'),
+    ('money_transactions'),
+    ('offices'),
+    ('relationships'),
+    ('site_settings'),
+    ('source_records'),
+    ('sources'),
+    ('votes')
+)
+SELECT table_names.table_name,
+  CASE table_names.table_name
+    WHEN 'analyses' THEN (SELECT COUNT(*) FROM "analyses")
+    WHEN 'analysis_findings' THEN (SELECT COUNT(*) FROM "analysis_findings")
+    WHEN 'backfill_jobs' THEN (SELECT COUNT(*) FROM "backfill_jobs")
+    WHEN 'bill_sponsors' THEN (SELECT COUNT(*) FROM "bill_sponsors")
+    WHEN 'bills' THEN (SELECT COUNT(*) FROM "bills")
+    WHEN 'candidacies' THEN (SELECT COUNT(*) FROM "candidacies")
+    WHEN 'case_challenges' THEN (SELECT COUNT(*) FROM "case_challenges")
+    WHEN 'committees' THEN (SELECT COUNT(*) FROM "committees")
+    WHEN 'court_cases' THEN (SELECT COUNT(*) FROM "court_cases")
+    WHEN 'elections' THEN (SELECT COUNT(*) FROM "elections")
+    WHEN 'entities' THEN (SELECT COUNT(*) FROM "entities")
+    WHEN 'entity_aliases' THEN (SELECT COUNT(*) FROM "entity_aliases")
+    WHEN 'executive_orders' THEN (SELECT COUNT(*) FROM "executive_orders")
+    WHEN 'external_ids' THEN (SELECT COUNT(*) FROM "external_ids")
+    WHEN 'ingest_runs' THEN (SELECT COUNT(*) FROM "ingest_runs")
+    WHEN 'member_votes' THEN (SELECT COUNT(*) FROM "member_votes")
+    WHEN 'money_transactions' THEN (SELECT COUNT(*) FROM "money_transactions")
+    WHEN 'offices' THEN (SELECT COUNT(*) FROM "offices")
+    WHEN 'relationships' THEN (SELECT COUNT(*) FROM "relationships")
+    WHEN 'site_settings' THEN (SELECT COUNT(*) FROM "site_settings")
+    WHEN 'source_records' THEN (SELECT COUNT(*) FROM "source_records")
+    WHEN 'sources' THEN (SELECT COUNT(*) FROM "sources")
+    WHEN 'votes' THEN (SELECT COUNT(*) FROM "votes")
+  END AS row_count
+FROM table_names
+ORDER BY table_names.table_name;
