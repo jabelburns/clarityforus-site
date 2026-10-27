@@ -46,7 +46,7 @@ PY
 
 # Real Wrangler-generated *local* D1 export; never --remote.
 pnpm exec wrangler d1 export DB --local --config dist/server/wrangler.json \
-  --output "$work/synthetic-local-export.sql" --yes
+  --output "$work/synthetic-local-export.sql" --skip-confirmation
 python3 tools/verify_d1_export.py "$work/synthetic-local-export.sql" \
   --expected-counts "$work/baseline.json" > "$work/report.json"
 
