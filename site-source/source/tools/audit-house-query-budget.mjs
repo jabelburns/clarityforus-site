@@ -94,7 +94,7 @@ export function auditHouseQueryBudget({ route, auth, helper }) {
     "Route no longer passes its safe limit to roll-call discovery");
   assert(/const\s+safeLimit\s*=\s*Math\.min\(\s*Math\.max\(\s*Math\.trunc\(limit\)\s*,\s*1\s*\)\s*,\s*25\s*\)/.test(helper) &&
     /\.slice\(\s*0\s*,\s*safeLimit\s*\)/.test(helper) &&
-    /\blimit:\s*10\s*,?/.test(helper),
+    /\blimit\s*=\s*10\s*,?/.test(helper),
     "House discovery helper limit behavior needs re-review");
   assert(!/\bgetDb\s*\(|\benv\.DB\b|cloudflare:workers/.test(helper),
     "House network/parse helper must not use D1 directly");
