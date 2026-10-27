@@ -196,6 +196,64 @@ async function optionalEndpoint(
   }
 }
 
+// Exhaust each cosponsor list, including withdrawn records. A single
+// Congress.gov request previously stopped after its first 100 records.
+async function completeBillCosponsors(apiKey: string, path: string) {
+  const limit = 250; // Congress.gov documented API page maximum.
+  const maxPages = 4; // More than the current combined House/Senate membership.
+  const records: JsonRecord[] = [];
+  let offset = 0;
+  for (let page = 0; page < maxPages; page += 1) {
+    const payload = await fetchCongressJson(apiKey, path, { limit, offset });
+    if (!Array.isArray(payload.cosponsors) && !Array.isArray(payload.members)) {
+      throw new Error("Congress.gov cosponsor page omitted its record collection.");
+    }
+    const batch = endpointArray(payload, ["cosponsors", "members"]);
+    const pagination = objectValue(payload.pagination);
+    const next = stringValue(pagination.next);
+    const total = numberValue(
+      pagination.countIncludingWithdrawnCosponsors ?? pagination.count,
+    );
+    if (total !== null && (!Number.isInteger(total) || total < 0)) {
+      throw new Error("Congress.gov cosponsor pagination returned an invalid total.");
+    }
+    records.push(...batch);
+    if (next) {
+      // Use offsets calculated from accepted records, not arbitrary API-provided
+      // URLs (which could point to a different host).
+      if (!batch.length || batch.length > limit) {
+        throw new Error("Congress.gov cosponsor pagination did not advance safely.");
+      }
+      offset += batch.length;
+      continue;
+    }
+    // No more pages according to the API. If pagination was omitted and we
+    // received a full page, do not silently assume a complete snapshot.
+    if ((total !== null && records.length < total) ||
+        (total === null && batch.length >= limit)) {
+      throw new Error("Congress.gov cosponsor pagination ended before completion.");
+    }
+    return {
+      label: "cosponsors",
+      payload: { cosponsors: records } as JsonRecord,
+      error: null as string | null,
+    };
+  }
+  throw new Error("Congress.gov cosponsor pagination exceeded the safe page bound.");
+}
+
+async function completeCosponsorEndpoint(apiKey: string, path: string) {
+  try {
+    return await completeBillCosponsors(apiKey, path);
+  } catch (error) {
+    return {
+      label: "cosponsors",
+      payload: {} as JsonRecord,
+      error: error instanceof Error ? error.message : "Cosponsor pagination failed.",
+    };
+  }
+}
+
 async function mapWithConcurrency<T, R>(
   values: T[],
   concurrency: number,
@@ -229,7 +287,7 @@ async function hydrateBill(apiKey: string, listRecord: JsonRecord) {
   const bill = objectValue(detailPayload.bill);
   const endpoints = await Promise.all([
     optionalEndpoint(apiKey, `${path}/actions`, "actions", 60),
-    optionalEndpoint(apiKey, `${path}/cosponsors`, "cosponsors", 100),
+    completeCosponsorEndpoint(apiKey, `${path}/cosponsors`),
     optionalEndpoint(apiKey, `${path}/summaries`, "summaries", 10),
     optionalEndpoint(apiKey, `${path}/text`, "text", 250),
     optionalEndpoint(apiKey, `${path}/amendments`, "amendments", 60),
