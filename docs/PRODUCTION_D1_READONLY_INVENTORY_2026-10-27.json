@@ -1,0 +1,125 @@
+{
+  "description": "Reported read-only inventory of existing managed Sites D1 binding DB; metadata only, no rows",
+  "source": "Owner-authorized existing clarity-for-us Sites assessment, reported 2026-10-27",
+  "site_source_version": "v28",
+  "deployed_source_commit": "a66c3ea8b41b4118ebabe52da49529d8baf7fc51",
+  "initial_count_sample_utc": "2026-10-27T16:07:43.811Z",
+  "paginated_read_window_utc": {
+    "start": "2026-10-27T16:08:35.747Z",
+    "end": "2026-10-27T16:13:38.826Z"
+  },
+  "final_count_verification_utc": "2026-10-27T16:14:33.014Z",
+  "schema_marker_reported": "2026-10-15.v3",
+  "source_migration_names": [
+    "0000_amused_stature",
+    "0001_flippant_thunderbolt"
+  ],
+  "schema_migrations_applied_to_live_database_unverified": true,
+  "point_in_time_snapshot": false,
+  "native_full_export_available_to_owner": "unverified_not_exposed",
+  "row_bytes_available": false,
+  "notes": [
+    "Thirteen methods were live COUNT(*) through deployed read-only status-route source; ten methods completed paginated Sites table reader.",
+    "Field values were truncated by reader including raw source JSON, so pages are not a recoverable row backup.",
+    "Thirteen count_sql results were unchanged across initial and final count checks; separate reads were not transactionally consistent.",
+    "Visible table/column names match deployed v28 source, but production migration ledger, indexes and hidden tables were not exposed.",
+    "Counts are source-reported; not independently queried by GitHub CI or this conversation. Preserve method provenance per table.",
+    "Historical published data may change after this sample due to enabled ingestion. Do not assume row counts imply data identity or parity.",
+    "No private row, owner identifier, key, access token, or full dataset is included."
+  ],
+  "tables": {
+    "analyses": {
+      "rows": 0,
+      "method": "count_sql"
+    },
+    "analysis_findings": {
+      "rows": 0,
+      "method": "complete_pagination"
+    },
+    "backfill_jobs": {
+      "rows": 5,
+      "method": "complete_pagination"
+    },
+    "bill_sponsors": {
+      "rows": 426,
+      "method": "complete_pagination"
+    },
+    "bills": {
+      "rows": 75,
+      "method": "count_sql"
+    },
+    "candidacies": {
+      "rows": 99,
+      "method": "count_sql"
+    },
+    "case_challenges": {
+      "rows": 3,
+      "method": "complete_pagination"
+    },
+    "committees": {
+      "rows": 129,
+      "method": "count_sql"
+    },
+    "court_cases": {
+      "rows": 3,
+      "method": "count_sql"
+    },
+    "elections": {
+      "rows": 66,
+      "method": "count_sql"
+    },
+    "entities": {
+      "rows": 3266,
+      "method": "count_sql"
+    },
+    "entity_aliases": {
+      "rows": 878,
+      "method": "complete_pagination"
+    },
+    "executive_orders": {
+      "rows": 52,
+      "method": "count_sql"
+    },
+    "external_ids": {
+      "rows": 2432,
+      "method": "complete_pagination"
+    },
+    "ingest_runs": {
+      "rows": 223,
+      "method": "complete_pagination"
+    },
+    "member_votes": {
+      "rows": 17296,
+      "method": "count_sql"
+    },
+    "money_transactions": {
+      "rows": 1222,
+      "method": "count_sql"
+    },
+    "offices": {
+      "rows": 439,
+      "method": "count_sql"
+    },
+    "relationships": {
+      "rows": 5915,
+      "method": "count_sql"
+    },
+    "site_settings": {
+      "rows": 1,
+      "method": "complete_pagination"
+    },
+    "source_records": {
+      "rows": 2026,
+      "method": "complete_pagination"
+    },
+    "sources": {
+      "rows": 486,
+      "method": "complete_pagination"
+    },
+    "votes": {
+      "rows": 40,
+      "method": "count_sql"
+    }
+  },
+  "reported_total_rows": 35082
+}
