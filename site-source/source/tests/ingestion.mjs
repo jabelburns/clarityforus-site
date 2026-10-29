@@ -55,6 +55,10 @@ const api = await import(`data:text/javascript;base64,${Buffer.from(output.outpu
 let failEnrichment = false;
 let cosponsorTotal = 100;
 let failCosponsorLaterPage = false;
+let longBillSubresources = false;
+let failActionsLaterPage = false;
+let truncateActionsLaterPage = false;
+let hugeAmendmentCount = false;
 let unexpectedFetch = false;
 const fetched = [];
 const json = (value) => Response.json(value);
@@ -101,8 +105,38 @@ globalThis.fetch = async (input) => {
       },
     });
   }
-  if (path.endsWith('/committees')) return json({ committees: [{ systemCode: 'hsed00', name: 'Education and Workforce Committee', chamber: 'House', type: 'Standing' }] });
-  for (const key of ['actions', 'summaries', 'text', 'amendments']) if (path.endsWith(`/${key}`)) return json({ [key]: [] });
+  for (const kind of ['actions', 'summaries', 'text', 'amendments', 'committees']) {
+    if (!path.endsWith('/' + kind)) continue;
+    const key = kind === 'text' ? 'textVersions' : kind;
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    const total = hugeAmendmentCount && kind === 'amendments' ? 25 :
+      longBillSubresources && kind === 'actions' ? 300 :
+      longBillSubresources && kind === 'summaries' ? 270 :
+      longBillSubresources && kind === 'text' ? 280 :
+      kind === 'committees' ? 1 : 0;
+    if (kind === 'actions' && failActionsLaterPage && offset >= 250) {
+      return new Response('Simulated actions page unavailable', { status: 503 });
+    }
+    const size = Math.max(0, Math.min(limit, total - offset));
+    const records = Array.from({ length: size }, (_, i) => {
+      const n = offset + i;
+      if (kind === 'committees') return { systemCode: 'hsed00', name: 'Education and Workforce Committee', chamber: 'House', type: 'Standing' };
+      if (kind === 'amendments') return { congress: 119, type: 'hamdt', number: String(n+1), description: 'Fictional amendment' };
+      if (kind === 'actions') return { actionCode: String(n), text: 'Fictional bill action ' + n };
+      if (kind === 'summaries') return { versionCode: String(n), text: 'Fictional summary ' + n };
+      return { type: 'Fictional', formats: [], versionCode: String(n) };
+    });
+    const shouldContinue = offset + size < total;
+    return json({
+      [key]: records,
+      pagination: {
+        count: total,
+        next: shouldContinue && !(kind === 'actions' && truncateActionsLaterPage)
+          ? 'https://api.congress.gov/v3/bill/119/hr/55/' + kind + '?offset=' + (offset+size) : null,
+      },
+    });
+  }
   if (url.hostname === 'clerk.house.gov' && path === '/Votes/MemberVotes') return new Response('<a href="/Votes/2026319">319</a><a href="/Votes/2026318">318</a>');
   const roll = path.match(/\/evs\/(\d{4})\/roll(\d+)\.xml/);
   if (roll) {
@@ -256,6 +290,60 @@ await test('Congress incomplete cosponsor page holds backfill cursor for retry',
   assert.equal(JSON.parse(row('congress').cursor).offset, 56);
   assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 300);
   cosponsorTotal = 100;
+});
+await test('Congress multi-page actions, summaries and text are fully stored in source snapshot', async () => {
+  longBillSubresources = true;
+  const oldFetchCount = fetched.length;
+  const result = await post(api.congress, 'congress?congress=119&offset=67&limit=1');
+  longBillSubresources = false;
+  assert.equal(result.body.ok, true, JSON.stringify(result.body));
+  assert.ok(result.queries <= 50, 'Multi-page bill exceeded 50 mock D1 calls');
+  const record = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get();
+  const snapshot = JSON.parse(record.raw_json);
+  assert.equal(snapshot.actions.length, 300);
+  assert.equal(snapshot.summaries.length, 270);
+  assert.equal(snapshot.textVersions.length, 280);
+  const recent = fetched.slice(oldFetchCount);
+  for (const kind of ['actions', 'summaries', 'text']) {
+    assert.deepEqual(recent.filter((url) => url.pathname.endsWith('/' + kind))
+      .map((url) => Number(url.searchParams.get('offset'))), [0, 250], kind);
+  }
+  console.log('Congress 3 multi-page subresources, mock D1 queries: ' + result.queries);
+});
+await test('Congress incomplete actions page fails before writes and preserves backfill cursor', async () => {
+  const before = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json;
+  seedJob('congress', '119', { offset: 70 });
+  const checkpoint = row('congress');
+  longBillSubresources = true;
+  failActionsLaterPage = true;
+  const failed = await post(api.backfill, 'backfill?dataset=congress');
+  failActionsLaterPage = false;
+  longBillSubresources = false;
+  assert.equal(failed.response.status, 500);
+  assert.match(failed.body.error, /bill source incomplete.*actions: Congress.gov returned HTTP 503/);
+  assert.equal(row('congress').cursor, checkpoint.cursor);
+  assert.equal(row('congress').batches_completed, checkpoint.batches_completed);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
+  const retry = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(retry.body.ok, true, JSON.stringify(retry.body));
+  assert.equal(JSON.parse(row('congress').cursor).offset, 71);
+});
+await test('Congress false final-page claim or budget-heavy graph fails without changing raw evidence', async () => {
+  const before = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json;
+  longBillSubresources = true;
+  truncateActionsLaterPage = true;
+  const truncated = await post(api.congress, 'congress?congress=119&offset=90&limit=1');
+  truncateActionsLaterPage = false;
+  longBillSubresources = false;
+  assert.equal(truncated.response.status, 500);
+  assert.match(truncated.body.error, /actions.*pagination ended before completion/);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
+  hugeAmendmentCount = true;
+  const excessive = await post(api.congress, 'congress?congress=119&offset=91&limit=1');
+  hugeAmendmentCount = false;
+  assert.equal(excessive.response.status, 500);
+  assert.match(excessive.body.error, /safe D1 query budget/);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
 });
 await test('House batches preserve official bill details and all member positions', async () => {
   const result = await post(api.houseVotes, 'house-votes?year=2026&limit=25');
