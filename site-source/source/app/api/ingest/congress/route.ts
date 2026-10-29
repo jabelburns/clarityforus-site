@@ -540,20 +540,23 @@ export async function POST(request: Request) {
 
     try {
       const bundles = await fetchRecentCongressBills(env.CONGRESS_API_KEY, limit, { congress, offset });
+      // Reject incomplete Congress.gov source coverage before writing bill,
+      // source snapshot, sponsors or graph edges. The backfill checkpoint
+      // remains at this bill until all expected publisher pages are available.
+      const gaps = bundles.flatMap((bill) => bill.endpointErrors);
+      if (gaps.length) {
+        throw new Error("Congress.gov bill source incomplete; retry this page. " +
+          gaps.join("; ").slice(0, 800));
+      }
+      // Large bills must not exceed the D1 per-Worker query budget due to
+      // individual amendment/committee writes. Until those are bulk-imported,
+      // refuse this bill rather than committing a truncated or failed import.
+      if (bundles.some((bill) => bill.amendments.length > 12 || bill.committees.length > 12)) {
+        throw new Error("Congress.gov bill exceeds the current safe per-request D1 graph-write budget.");
+      }
       const now = new Date().toISOString();
       const results = [];
       for (const bundle of bundles) results.push(await writeBill(bundle, now));
-
-      // A partial cosponsor page must fail the direct ingest call as well as
-      // backfill; the unattended writer cannot mistake incomplete links for a
-      // successful full bill refresh. Existing source records can be retried.
-      const incompleteCosponsors = results.flatMap((row) =>
-        row.endpointErrors.filter((message) => message.startsWith("cosponsors:")),
-      );
-      if (incompleteCosponsors.length) {
-        throw new Error("Congress.gov cosponsors incomplete; retry this bill page. " +
-          incompleteCosponsors.join("; ").slice(0, 500));
-      }
 
       await db
         .update(ingestRuns)
