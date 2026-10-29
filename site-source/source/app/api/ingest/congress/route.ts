@@ -548,11 +548,17 @@ export async function POST(request: Request) {
         throw new Error("Congress.gov bill source incomplete; retry this page. " +
           gaps.join("; ").slice(0, 800));
       }
-      // Large bills must not exceed the D1 per-Worker query budget due to
-      // individual amendment/committee writes. Until those are bulk-imported,
-      // refuse this bill rather than committing a truncated or failed import.
-      if (bundles.some((bill) => bill.amendments.length > 12 || bill.committees.length > 12)) {
-        throw new Error("Congress.gov bill exceeds the current safe per-request D1 graph-write budget.");
+      // Current source path has 7 fixed writes per bill (including ingest run),
+      // four JSON1 statements per <=200 sponsors, three per amendment and two
+      // per committee. Reserve at least 10 of the 50 Free-tier D1 calls for
+      // backfill, owner authorization and transport differences.
+      const projectedQueries = bundles.reduce((total, bill) =>
+        total + 7 +
+        4 * Math.ceil((bill.sponsors.length + bill.cosponsors.length) / 200) +
+        3 * bill.amendments.length + 2 * bill.committees.length, 0);
+      if (projectedQueries > 40) {
+        throw new Error("Congress.gov bill exceeds the safe D1 query budget for this request; " +
+          "use a smaller graph-writing batch before importing this bill.");
       }
       const now = new Date().toISOString();
       const results = [];
