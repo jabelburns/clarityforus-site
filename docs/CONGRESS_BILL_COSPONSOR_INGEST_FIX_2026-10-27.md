@@ -13,7 +13,7 @@
 - Sponsor and cosponsor graph upserts now use **four SQLite JSON1 statements per chunk**, with **200 sponsors per chunk** and one bound JSON parameter per statement. Current Bioguide-based identities and graph relationship IDs are unchanged. Non-null state/district refresh is retained; established member canonical names are not overwritten. Sponsor joined/withdrawn dates and evidence source are updated on replay.
 - Cosponsor endpoint fetch uses documented max **250 records per page**, bounded to at most four pages. It requests sequential offsets without blindly following untrusted `pagination.next` URLs. If an incomplete or stalled upstream page is detected, it emits an explicit source warning rather than accepting a truncated result. The complete retrieved set is included in the bill's raw source snapshot.
 - Congress backfill now treats `partialEndpointErrors` as a **retry condition**, retains the prior durable cursor, and records the partial error. A subsequent successful call may continue.
-- Incomplete **cosponsor** pages now fail the direct Congress ingestion request with HTTP 500 and cause its ingest run to be marked failed; the backfill retains its existing cursor for the next attempt. Other optional endpoint errors remain explicitly reported as `partialEndpointErrors` and are retryable in the backfill path. A full fail-closed policy for all optional publisher endpoints still requires a separate product decision, because some resources are genuinely unavailable for older bills.
+- **Updated October 28:** incomplete cosponsor **and other bill subresource** pages now fail direct ingestion **before any bill/source snapshot/graph writes** and mark the run failed. The backfill retains the existing cursor for retry. Actions, summaries, text versions, amendments and committees have bounded pagination. Legitimately unavailable optional endpoints (e.g. specific 404 cases) still require publisher-specific handling; they are not blindly classified as complete-empty.
 
 ## CI evidence
 
@@ -29,7 +29,7 @@
 
 ## Remaining follow-ups
 
-- Review whether all other Congress.gov optional endpoints (actions, amendments, committees, text, summaries) need separate complete-pagination handling, where partial data may affect the public graph.
+- The other Congress.gov optional endpoints now have bounded complete pagination; next verify historical date-window/list-offset coverage, >2,000-item endpoints and publisher-defined 404 semantics before remote staging.
 - Verify official source record coverage, dates, withdrawn status and publisher pagination metadata on a separated owner-controlled staging Worker, not on the existing Sites DB.
 - Implement a staging writer that treats `partialEndpointErrors` as retryable and enforces publisher rate limits, stable cursors and network timeouts.
 - Do **not** merge or deploy until separate D1 staging, backups/restore, current live Site parity, scheduler secret handling and public records validation pass.
