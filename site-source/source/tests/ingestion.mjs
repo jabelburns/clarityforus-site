@@ -42,7 +42,7 @@ const d1 = {
 globalThis.__ingestTestEnv = { DB: d1, INGEST_TOKEN: 'test-only', FEC_API_KEY: 'test-only', CONGRESS_API_KEY: 'test-only' };
 const output = await build({
   stdin: {
-    contents: `export * from './lib/fec.ts'; export * from './lib/ingest-progress.ts'; export { POST as backfill } from './app/api/ingest/backfill/route.ts'; export { POST as houseVotes } from './app/api/ingest/house-votes/route.ts';`,
+    contents: `export * from './lib/fec.ts'; export * from './lib/ingest-progress.ts'; export { POST as backfill } from './app/api/ingest/backfill/route.ts'; export { POST as houseVotes } from './app/api/ingest/house-votes/route.ts'; export { POST as congress } from './app/api/ingest/congress/route.ts';`,
     resolveDir: process.cwd(), loader: 'ts',
   },
   bundle: true, platform: 'node', format: 'esm', write: false,
@@ -53,6 +53,12 @@ const output = await build({
 });
 const api = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text).toString('base64')}`);
 let failEnrichment = false;
+let cosponsorTotal = 100;
+let failCosponsorLaterPage = false;
+let longBillSubresources = false;
+let failActionsLaterPage = false;
+let truncateActionsLaterPage = false;
+let hugeAmendmentCount = false;
 let unexpectedFetch = false;
 const fetched = [];
 const json = (value) => Response.json(value);
@@ -82,9 +88,55 @@ globalThis.fetch = async (input) => {
     return json({ bills: offset > 900 ? [] : [{ congress: 119, type: 'HR', number: '55', title: 'Complete official title' }] });
   }
   if (path === '/v3/bill/119/hr/55') return json({ bill: { title: 'Complete official title', introducedDate: '2026-01-01', sponsors: [] } });
-  if (path.endsWith('/cosponsors')) return json({ cosponsors: Array.from({ length: 100 }, (_, i) => ({ bioguideId: `T${String(i).padStart(6, '0')}`, firstName: `Member ${i}`, lastName: 'Test', state: 'KS' })) });
-  if (path.endsWith('/committees')) return json({ committees: [{ systemCode: 'hsed00', name: 'Education and Workforce Committee', chamber: 'House', type: 'Standing' }] });
-  for (const key of ['actions', 'summaries', 'text', 'amendments']) if (path.endsWith(`/${key}`)) return json({ [key]: [] });
+  if (path.endsWith('/cosponsors')) {
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    if (failCosponsorLaterPage && offset >= 250) return new Response('temporary upstream error', { status: 503 });
+    const count = Math.max(0, Math.min(limit, cosponsorTotal - offset));
+    return json({
+      cosponsors: Array.from({ length: count }, (_, i) => {
+        const member = offset + i;
+        return { bioguideId: `T${String(member).padStart(6, '0')}`, firstName: `Member ${member}`, lastName: 'Test', state: 'KS' };
+      }),
+      pagination: {
+        count: cosponsorTotal,
+        countIncludingWithdrawnCosponsors: cosponsorTotal,
+        next: offset + count < cosponsorTotal ? 'https://api.congress.gov/v3/bill/119/hr/55/cosponsors?offset=' + (offset + count) : null,
+      },
+    });
+  }
+  for (const kind of ['actions', 'summaries', 'text', 'amendments', 'committees']) {
+    if (!path.endsWith('/' + kind)) continue;
+    const key = kind === 'text' ? 'textVersions' : kind;
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 20);
+    const total = hugeAmendmentCount && kind === 'amendments' ? 25 :
+      longBillSubresources && kind === 'actions' ? 300 :
+      longBillSubresources && kind === 'summaries' ? 270 :
+      longBillSubresources && kind === 'text' ? 280 :
+      kind === 'committees' ? 1 : 0;
+    if (kind === 'actions' && failActionsLaterPage && offset >= 250) {
+      return new Response('Simulated actions page unavailable', { status: 503 });
+    }
+    const size = Math.max(0, Math.min(limit, total - offset));
+    const records = Array.from({ length: size }, (_, i) => {
+      const n = offset + i;
+      if (kind === 'committees') return { systemCode: 'hsed00', name: 'Education and Workforce Committee', chamber: 'House', type: 'Standing' };
+      if (kind === 'amendments') return { congress: 119, type: 'hamdt', number: String(n+1), description: 'Fictional amendment' };
+      if (kind === 'actions') return { actionCode: String(n), text: 'Fictional bill action ' + n };
+      if (kind === 'summaries') return { versionCode: String(n), text: 'Fictional summary ' + n };
+      return { type: 'Fictional', formats: [], versionCode: String(n) };
+    });
+    const shouldContinue = offset + size < total;
+    return json({
+      [key]: records,
+      pagination: {
+        count: total,
+        next: shouldContinue && !(kind === 'actions' && truncateActionsLaterPage)
+          ? 'https://api.congress.gov/v3/bill/119/hr/55/' + kind + '?offset=' + (offset+size) : null,
+      },
+    });
+  }
   if (url.hostname === 'clerk.house.gov' && path === '/Votes/MemberVotes') return new Response('<a href="/Votes/2026319">319</a><a href="/Votes/2026318">318</a>');
   const roll = path.match(/\/evs\/(\d{4})\/roll(\d+)\.xml/);
   if (roll) {
@@ -179,7 +231,119 @@ await test('Bounded Congress retry handles 100 cosponsors without losing relatio
   assert.equal(result.body.ok, true, JSON.stringify(result.body));
   assert.equal(result.body.cursor.offset, 21);
   assert.equal(result.body.batch.sponsorsLinked, 100);
+  assert.ok(result.queries <= 50, "Congress backfill must fit the D1 Free query budget; saw " + result.queries);
+  console.log("Congress backfill query count (mock D1): " + result.queries);
   assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare("select count(*) n from relationships where relationship_type='cosponsored'").get().n, 100);
+});
+await test('Congress reimport preserves curated member identity and idempotent sponsorships', async () => {
+  const curated = 'person:bioguide:T000000';
+  sqlite.prepare('update entities set canonical_name = ? where id = ?').run('Reviewed Legislator Name', curated);
+  const first = await post(api.congress, 'congress?congress=119&offset=20&limit=1');
+  assert.equal(first.body.ok, true, JSON.stringify(first.body));
+  assert.ok(first.queries <= 50, 'Congress direct import exceeded 50 D1 queries: ' + first.queries);
+  assert.equal(sqlite.prepare('select canonical_name from entities where id = ?').get(curated).canonical_name, 'Reviewed Legislator Name');
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare("select count(*) n from external_ids where source_system='congress_gov' and entity_id like 'person:bioguide:%'").get().n, 100);
+  const repeat = await post(api.congress, 'congress?congress=119&offset=20&limit=1');
+  assert.equal(repeat.body.ok, true, JSON.stringify(repeat.body));
+  assert.ok(repeat.queries <= 50, 'Congress replay exceeded 50 D1 queries: ' + repeat.queries);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 100);
+  assert.equal(sqlite.prepare('select canonical_name from entities where id = ?').get(curated).canonical_name, 'Reviewed Legislator Name');
+  console.log('Direct Congress import/replay mock D1 queries: ' + first.queries + '/' + repeat.queries);
+});
+await test('Congress cosponsor pagination ingests beyond first 100 and stays within D1 budget', async () => {
+  cosponsorTotal = 300;
+  const before = fetched.length;
+  const result = await post(api.congress, 'congress?congress=119&offset=25&limit=1');
+  assert.equal(result.body.ok, true, JSON.stringify(result.body));
+  assert.equal(result.body.sponsorsLinked, 300);
+  assert.ok(result.queries <= 50, 'Paginated Congress 300-member import exceeded the D1 Free budget: ' + result.queries);
+  const requested = fetched.slice(before).filter((url) => url.pathname.endsWith('/cosponsors'));
+  assert.deepEqual(requested.map((url) => Number(url.searchParams.get('offset'))), [0, 250]);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 300);
+  assert.equal(sqlite.prepare("select count(*) n from relationships where relationship_type='cosponsored'").get().n, 300);
+  assert.equal(sqlite.prepare("select count(*) n from external_ids where source_system='congress_gov' and entity_id like 'person:bioguide:%'").get().n, 300);
+  assert.equal(sqlite.prepare("select canonical_name from entities where id='person:bioguide:T000000'").get().canonical_name, 'Reviewed Legislator Name');
+  console.log('Congress 300-cosponsor paginated import mock D1 queries: ' + result.queries);
+  cosponsorTotal = 100;
+});
+await test('Congress incomplete cosponsor page holds backfill cursor for retry', async () => {
+  cosponsorTotal = 300;
+  failCosponsorLaterPage = true;
+  seedJob('congress', '119', { offset: 55 });
+  const before = row('congress');
+  const direct = await post(api.congress, 'congress?congress=119&offset=55&limit=1');
+  assert.equal(direct.response.status, 500);
+  assert.match(direct.body.error, /bill source incomplete.*cosponsors:.*HTTP 503/);
+  const result = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(result.response.status, 500);
+  assert.equal(result.body.ok, false);
+  assert.match(result.body.error, /bill source incomplete.*cosponsors:.*HTTP 503/);
+  assert.equal(row('congress').status, 'failed');
+  assert.equal(row('congress').cursor, before.cursor);
+  assert.equal(row('congress').batches_completed, before.batches_completed);
+  assert.match(row('congress').last_error, /cosponsors/);
+  failCosponsorLaterPage = false;
+  const resumed = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(resumed.body.ok, true, JSON.stringify(resumed.body));
+  assert.equal(JSON.parse(row('congress').cursor).offset, 56);
+  assert.equal(sqlite.prepare('select count(*) n from bill_sponsors').get().n, 300);
+  cosponsorTotal = 100;
+});
+await test('Congress multi-page actions, summaries and text are fully stored in source snapshot', async () => {
+  longBillSubresources = true;
+  const oldFetchCount = fetched.length;
+  const result = await post(api.congress, 'congress?congress=119&offset=67&limit=1');
+  longBillSubresources = false;
+  assert.equal(result.body.ok, true, JSON.stringify(result.body));
+  assert.ok(result.queries <= 50, 'Multi-page bill exceeded 50 mock D1 calls');
+  const record = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get();
+  const snapshot = JSON.parse(record.raw_json);
+  assert.equal(snapshot.actions.length, 300);
+  assert.equal(snapshot.summaries.length, 270);
+  assert.equal(snapshot.textVersions.length, 280);
+  const recent = fetched.slice(oldFetchCount);
+  for (const kind of ['actions', 'summaries', 'text']) {
+    assert.deepEqual(recent.filter((url) => url.pathname.endsWith('/' + kind))
+      .map((url) => Number(url.searchParams.get('offset'))), [0, 250], kind);
+  }
+  console.log('Congress 3 multi-page subresources, mock D1 queries: ' + result.queries);
+});
+await test('Congress incomplete actions page fails before writes and preserves backfill cursor', async () => {
+  const before = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json;
+  seedJob('congress', '119', { offset: 70 });
+  const checkpoint = row('congress');
+  longBillSubresources = true;
+  failActionsLaterPage = true;
+  const failed = await post(api.backfill, 'backfill?dataset=congress');
+  failActionsLaterPage = false;
+  longBillSubresources = false;
+  assert.equal(failed.response.status, 500);
+  assert.match(failed.body.error, /bill source incomplete.*actions: Congress.gov returned HTTP 503/);
+  assert.equal(row('congress').cursor, checkpoint.cursor);
+  assert.equal(row('congress').batches_completed, checkpoint.batches_completed);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
+  const retry = await post(api.backfill, 'backfill?dataset=congress');
+  assert.equal(retry.body.ok, true, JSON.stringify(retry.body));
+  assert.equal(JSON.parse(row('congress').cursor).offset, 71);
+});
+await test('Congress false final-page claim or budget-heavy graph fails without changing raw evidence', async () => {
+  const before = sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json;
+  longBillSubresources = true;
+  truncateActionsLaterPage = true;
+  const truncated = await post(api.congress, 'congress?congress=119&offset=90&limit=1');
+  truncateActionsLaterPage = false;
+  longBillSubresources = false;
+  assert.equal(truncated.response.status, 500);
+  assert.match(truncated.body.error, /actions.*pagination ended before completion/);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
+  hugeAmendmentCount = true;
+  const excessive = await post(api.congress, 'congress?congress=119&offset=91&limit=1');
+  hugeAmendmentCount = false;
+  assert.equal(excessive.response.status, 500);
+  assert.match(excessive.body.error, /safe D1 query budget/);
+  assert.equal(sqlite.prepare("select raw_json from source_records where id = 'congress-gov:bill:119:hr:55:bundle'").get().raw_json, before);
 });
 await test('House batches preserve official bill details and all member positions', async () => {
   const result = await post(api.houseVotes, 'house-votes?year=2026&limit=25');

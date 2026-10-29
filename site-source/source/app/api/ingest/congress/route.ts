@@ -3,7 +3,6 @@ import { env } from "cloudflare:workers";
 import { getDb } from "@/db";
 import {
   bills,
-  billSponsors,
   entities,
   externalIds,
   ingestRuns,
@@ -224,103 +223,141 @@ async function writeBill(bundle: CongressBillBundle, now: string) {
     ...bundle.sponsors.map((person) => ({ person, type: "sponsor" as const })),
     ...bundle.cosponsors.map((person) => ({ person, type: "cosponsor" as const })),
   ];
-  for (const row of sponsorRows) {
-    const personId = `person:bioguide:${row.person.bioguideId}`;
-    const name = personName(row.person);
-    await db
-      .insert(entities)
-      .values({
-        id: personId,
+  // Four bounded JSON1 writes per chunk replace four writes per sponsor.
+  // Preserve official Bioguide identities and source-backed graph edges.
+  const sponsorsPerChunk = 200;
+  for (let index = 0; index < sponsorRows.length; index += sponsorsPerChunk) {
+    const chunk = sponsorRows.slice(index, index + sponsorsPerChunk);
+    const personRows = chunk.map(({ person }) => {
+      const name = personName(person);
+      return {
+        id: "person:bioguide:" + person.bioguideId,
         entityType: "politician",
         canonicalName: name,
         normalizedName: normalizeName(name),
         jurisdictionLevel: "federal",
-        stateCode: row.person.state,
-        district: row.person.district,
-        description: personDescription(row.person),
+        stateCode: person.state,
+        district: person.district,
+        description: personDescription(person),
         status: "active",
         updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: entities.id,
-        set: {
-          stateCode: sql`coalesce(excluded.state_code, ${entities.stateCode})`,
-          district: sql`coalesce(excluded.district, ${entities.district})`,
-          updatedAt: now,
-        },
-      });
-
-    await db
-      .insert(externalIds)
-      .values({
-        entityId: personId,
-        sourceSystem: "congress_gov",
-        externalId: row.person.bioguideId,
-        officialUrl: `https://www.congress.gov/member/${row.person.bioguideId}`,
-        isPrimary: false,
-        verifiedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [externalIds.sourceSystem, externalIds.externalId],
-        set: { entityId: personId, verifiedAt: now },
-      });
-
-    await db
-      .insert(billSponsors)
-      .values({
-        id: `${billEntityId}:${row.type}:${personId}`,
+      };
+    });
+    const idRows = chunk.map(({ person }) => ({
+      entityId: "person:bioguide:" + person.bioguideId,
+      sourceSystem: "congress_gov",
+      externalId: person.bioguideId,
+      officialUrl: "https://www.congress.gov/member/" + person.bioguideId,
+      isPrimary: false,
+      verifiedAt: now,
+    }));
+    const sponsorLinks = chunk.map(({ person, type }) => {
+      const personId = "person:bioguide:" + person.bioguideId;
+      return {
+        id: billEntityId + ":" + type + ":" + personId,
         billEntityId,
         personEntityId: personId,
-        sponsorType: row.type,
-        joinedDate:
-          row.type === "sponsor"
-            ? bundle.introducedDate
-            : row.person.joinedDate,
-        withdrawnDate: row.person.withdrawnDate,
+        sponsorType: type,
+        joinedDate: type === "sponsor" ? bundle.introducedDate : person.joinedDate,
+        withdrawnDate: person.withdrawnDate,
         sourceId,
-      })
-      .onConflictDoUpdate({
-        target: billSponsors.id,
-        set: {
-          joinedDate:
-            row.type === "sponsor"
-              ? bundle.introducedDate
-              : row.person.joinedDate,
-          withdrawnDate: row.person.withdrawnDate,
-          sourceId,
-        },
-      });
-
-    await db
-      .insert(relationships)
-      .values({
-        id: `${personId}:${row.type}:${billEntityId}`,
+      };
+    });
+    const edges = chunk.map(({ person, type }) => {
+      const personId = "person:bioguide:" + person.bioguideId;
+      const relationshipType = type === "sponsor" ? "sponsored" : "cosponsored";
+      return {
+        id: personId + ":" + type + ":" + billEntityId,
         fromEntityId: personId,
         toEntityId: billEntityId,
-        relationshipType:
-          row.type === "sponsor" ? "sponsored" : "cosponsored",
-        description: `${name} ${row.type === "sponsor" ? "sponsored" : "cosponsored"} ${displayNumber}.`,
-        startDate:
-          row.type === "sponsor"
-            ? bundle.introducedDate
-            : row.person.joinedDate,
-        endDate: row.person.withdrawnDate,
+        relationshipType,
+        description: personName(person) + " " + relationshipType + " " + displayNumber + ".",
+        startDate: type === "sponsor" ? bundle.introducedDate : person.joinedDate,
+        endDate: person.withdrawnDate,
         confidence: 1,
         evidenceClass: "source_fact",
         sourceId,
-      })
-      .onConflictDoUpdate({
-        target: relationships.id,
-        set: {
-          description: `${name} ${row.type === "sponsor" ? "sponsored" : "cosponsored"} ${displayNumber}.`,
-          startDate:
-            row.type === "sponsor"
-              ? bundle.introducedDate
-              : row.person.joinedDate,
-          endDate: row.person.withdrawnDate,
-          sourceId,
-        },
-      });
+      };
+    });
+
+    // WHERE true resolves SQLite parser ambiguity before UPSERT. Never
+    // overwrite an established member's name with a stale bill snapshot.
+    await db.run(sql`INSERT INTO entities (
+      id, entity_type, canonical_name, normalized_name, jurisdiction_level,
+      state_code, district, description, status, updated_at
+    )
+    SELECT
+      json_extract(value, '$.id'),
+      json_extract(value, '$.entityType'),
+      json_extract(value, '$.canonicalName'),
+      json_extract(value, '$.normalizedName'),
+      json_extract(value, '$.jurisdictionLevel'),
+      json_extract(value, '$.stateCode'),
+      json_extract(value, '$.district'),
+      json_extract(value, '$.description'),
+      json_extract(value, '$.status'),
+      json_extract(value, '$.updatedAt')
+    FROM json_each(${JSON.stringify(personRows)}) WHERE true
+    ON CONFLICT(id) DO UPDATE SET
+      state_code = coalesce(excluded.state_code, entities.state_code),
+      district = coalesce(excluded.district, entities.district),
+      updated_at = excluded.updated_at`);
+
+    await db.run(sql`INSERT INTO external_ids (
+      entity_id, source_system, external_id, official_url,
+      is_primary, verified_at
+    )
+    SELECT
+      json_extract(value, '$.entityId'),
+      json_extract(value, '$.sourceSystem'),
+      json_extract(value, '$.externalId'),
+      json_extract(value, '$.officialUrl'),
+      json_extract(value, '$.isPrimary'),
+      json_extract(value, '$.verifiedAt')
+    FROM json_each(${JSON.stringify(idRows)}) WHERE true
+    ON CONFLICT(source_system, external_id) DO UPDATE SET
+      entity_id = excluded.entity_id,
+      verified_at = excluded.verified_at`);
+
+    await db.run(sql`INSERT INTO bill_sponsors (
+      id, bill_entity_id, person_entity_id, sponsor_type, joined_date,
+      withdrawn_date, source_id
+    )
+    SELECT
+      json_extract(value, '$.id'),
+      json_extract(value, '$.billEntityId'),
+      json_extract(value, '$.personEntityId'),
+      json_extract(value, '$.sponsorType'),
+      json_extract(value, '$.joinedDate'),
+      json_extract(value, '$.withdrawnDate'),
+      json_extract(value, '$.sourceId')
+    FROM json_each(${JSON.stringify(sponsorLinks)}) WHERE true
+    ON CONFLICT(id) DO UPDATE SET
+      joined_date = excluded.joined_date,
+      withdrawn_date = excluded.withdrawn_date,
+      source_id = excluded.source_id`);
+
+    await db.run(sql`INSERT INTO relationships (
+      id, from_entity_id, to_entity_id, relationship_type, description,
+      start_date, end_date, confidence, evidence_class, source_id
+    )
+    SELECT
+      json_extract(value, '$.id'),
+      json_extract(value, '$.fromEntityId'),
+      json_extract(value, '$.toEntityId'),
+      json_extract(value, '$.relationshipType'),
+      json_extract(value, '$.description'),
+      json_extract(value, '$.startDate'),
+      json_extract(value, '$.endDate'),
+      json_extract(value, '$.confidence'),
+      json_extract(value, '$.evidenceClass'),
+      json_extract(value, '$.sourceId')
+    FROM json_each(${JSON.stringify(edges)}) WHERE true
+    ON CONFLICT(id) DO UPDATE SET
+      description = excluded.description,
+      start_date = excluded.start_date,
+      end_date = excluded.end_date,
+      source_id = excluded.source_id`);
   }
 
   const amendmentRows = bundle.amendments.flatMap((record) => {
@@ -503,6 +540,26 @@ export async function POST(request: Request) {
 
     try {
       const bundles = await fetchRecentCongressBills(env.CONGRESS_API_KEY, limit, { congress, offset });
+      // Reject incomplete Congress.gov source coverage before writing bill,
+      // source snapshot, sponsors or graph edges. The backfill checkpoint
+      // remains at this bill until all expected publisher pages are available.
+      const gaps = bundles.flatMap((bill) => bill.endpointErrors);
+      if (gaps.length) {
+        throw new Error("Congress.gov bill source incomplete; retry this page. " +
+          gaps.join("; ").slice(0, 800));
+      }
+      // Current source path has 7 fixed writes per bill (including ingest run),
+      // four JSON1 statements per <=200 sponsors, three per amendment and two
+      // per committee. Reserve at least 10 of the 50 Free-tier D1 calls for
+      // backfill, owner authorization and transport differences.
+      const projectedQueries = bundles.reduce((total, bill) =>
+        total + 7 +
+        4 * Math.ceil((bill.sponsors.length + bill.cosponsors.length) / 200) +
+        3 * bill.amendments.length + 2 * bill.committees.length, 0);
+      if (projectedQueries > 40) {
+        throw new Error("Congress.gov bill exceeds the safe D1 query budget for this request; " +
+          "use a smaller graph-writing batch before importing this bill.");
+      }
       const now = new Date().toISOString();
       const results = [];
       for (const bundle of bundles) results.push(await writeBill(bundle, now));

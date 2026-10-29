@@ -1,0 +1,6 @@
+# Clarity for US — project-scoped Codex Cloudflare MCP endpoint
+# Loaded only after the local Codex client trusts this Git checkout.
+# No credentials, deployment permissions, API tokens or account ID are stored.
+# Cloudflare account authentication is interactive and owner-approved.
+[mcp_servers.cloudflare]
+url = "https://mcp.cloudflare.com/mcp"

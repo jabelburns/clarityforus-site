@@ -5,7 +5,6 @@ import {
   entities,
   externalIds,
   ingestRuns,
-  memberVotes,
   relationships,
   sourceRecords,
   sources,

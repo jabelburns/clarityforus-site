@@ -54,7 +54,7 @@ export function buildGraphPaths({center, depth, layers, nodes, sources, queryTru
  const reachedDepth = Math.min(depth, layers.length);
  for (let level = 0; level < reachedDepth; level++) {
   const current = new Set(frontier);
-  let next: string[] = [];
+  const next: string[] = [];
   const sorted = (layers[level] || []).slice().sort((a,b)=>a.id.localeCompare(b.id));
   for (const relation of sorted) {
    if (seenEdges.has(relation.id)) continue;

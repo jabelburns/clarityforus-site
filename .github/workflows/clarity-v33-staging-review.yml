@@ -1,0 +1,58 @@
+name: Clarity v33.1 isolated staging review
+
+on:
+  push:
+    branches:
+      - codex/v33-1-ci-review-2026-10-26
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: site-source/source
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned packages (no production bindings)
+        run: |
+          npm install --global pnpm@11.25.0
+          pnpm install --frozen-lockfile
+      - name: Feature, security and ingestion regression tests
+        run: |
+          pnpm run test:vision
+          pnpm run test:senate
+          pnpm run test:bill-versions
+          pnpm run test:graph
+          pnpm run test:campaign
+          node --test tests/security.mjs tests/release-integration.mjs tests/phase0-source-contract.mjs
+          pnpm run test:ingestion
+          node --test tests/house-query-budget.mjs
+          node tools/audit-house-query-budget.mjs
+      - name: Synthetic D1 SQL regression checks (no production data)
+        run: |
+          python3 tests/house-bulk-sql.py
+          python3 tests/campaign-finance-sql.py
+          python3 tests/d1-restore-audit.py
+          python3 tests/rebuild-baseline.py
+          python3 tests/isolated-target-prep.py
+          python3 tests/codex-cloudflare-config.py
+      - name: Lint
+        run: pnpm run lint
+      - name: Create disposable CI-only Sites hosting metadata
+        run: |
+          mkdir -p .openai
+          printf '%s\n' '{"d1":"DB","r2":null}' > .openai/hosting.json
+      - name: Build staging source without deployment
+        run: pnpm run build
+      - name: Native Wrangler local D1 export and isolated restore (synthetic only)
+        run: bash scripts/ci-local-d1-roundtrip.sh
